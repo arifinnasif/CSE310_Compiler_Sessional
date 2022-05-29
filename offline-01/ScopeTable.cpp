@@ -1,5 +1,6 @@
 #include "SymbolInfo.cpp"
 //#include <cstddef>
+#include <cstdint>
 #include <ostream>
 #include <string>
 #include <fstream>
@@ -20,34 +21,53 @@ class ScopeTable {
         
 
 
-        unsigned long hash(string arg) {
-            unsigned long hash = 0;
+        uint32_t hash(string arg) {
+            uint32_t hash = 0;
+            // int hash = 0;
             int c;
+
+            // cout<<"Size"<<sizeof(hash)<<endl;
             
 
             for(int i = 0; i < arg.length(); i++) {
                 c = arg.at(i);
                 hash = c + (hash << 6) + (hash << 16) - hash;
+                // hash = hash % n;
             }
-
-            return hash%n;
+            
+            return hash % n;
         }
+
+        // unsigned long long hash(string arg) {
+        //     unsigned long long hash = 0;
+        //     unsigned long long c;
+            
+        //     char* str = (char*)arg.c_str();
+        //     while (c = (unsigned long long) *str++) {
+        //         hash = c + (hash << 6) + (hash << 16) - hash;
+        //         // hash = hash % n;
+        //     }
+        //     cout<<n<<endl;
+        //     return hash%n;
+        // }
 
         
 
     public:
         ScopeTable(int arg_n, ScopeTable * argParentScopeTable) {
+
+            
             this->n = arg_n;
             if(argParentScopeTable == NULL)
                 this->id = ROOT_ID;
             else
                 this->id = ++(argParentScopeTable->childCount);
-            this->buckets = new SymbolInfo * [n];
+            this->buckets = new SymbolInfo * [n]();
             this->parentScopeTable = argParentScopeTable;
             this->childCount = 0;
 
             
-
+            // cout<<hash("foo")<<endl;
             // os<<"New ScopeTable with id "<<getAbsoluteID()<<" created"<<endl;
         }
 
@@ -60,6 +80,7 @@ class ScopeTable {
                     delete temp;
                 }
             }
+            delete [] buckets;
             // os<<"ScopeTable with id "<<getAbsoluteID()<<" removed"<<endl;
         }
 
@@ -68,7 +89,7 @@ class ScopeTable {
         // }
 
         bool insert(string arg_name, string arg_type, int * pos1 = NULL, int * pos2 = NULL) {
-            unsigned long h = hash(arg_name);
+            uint32_t h = hash(arg_name);
             int cnt = 0;
             if(buckets[h] == NULL) {
                 buckets[h] = new SymbolInfo(arg_name, arg_type, &buckets[h], NULL, NULL);
@@ -96,7 +117,7 @@ class ScopeTable {
         }
 
         SymbolInfo * lookup(string arg, int * pos1 = NULL, int * pos2 = NULL) {
-            unsigned long h = hash(arg);
+            uint32_t h = hash(arg);
             SymbolInfo* temp = buckets[h];
             int cnt = 0;
 

@@ -8,7 +8,7 @@
 
 using namespace std;
 
-string INPUT_FILE = "input.txt";
+string INPUT_FILE = "input_sample_new.txt";
 string OUTPUT_FILE = "output2.txt";
 
 vector<string> split(string str, char delim) {
@@ -18,10 +18,10 @@ vector<string> split(string str, char delim) {
     vector<string> tkn;
 
 
-    while(str[i]) {
+    while(str[i] && str[i] != '\r') {
         if(str[i]!=delim) {
             if(i==0||str[i-1]==delim) start=i;
-            if(str[i+1]=='\0' || str[i+1]==delim) {
+            if(str[i+1]=='\0' || str[i+1]=='\r' || str[i+1]==delim) {
                 tkn.push_back(str.substr(start, i-start+1));
             }
         }
@@ -44,16 +44,18 @@ int main() {
 
     vector<string> cmd;
     
-    getline(ifile, line);
-    ifile.sync();
+    getline(ifile, line, '\n');
 
     n = stoi(line);
+
+    // cout<<n<<"h";
 
     SymbolTable * symbolTable = new SymbolTable(n);
     
 
-    while(getline(ifile, line)) {
-        cout<<line<<endl;
+    while(getline(ifile, line, '\n')) {
+        ofile<<line<<endl;
+        // cout<<line<<endl;
         // while(true) {
         // getline(cin, line);
         cmd = split(line, ' ');
@@ -70,9 +72,14 @@ int main() {
             }
 
             case 'L': {
+                if(symbolTable->getCurrentScopeTable() == NULL) {
+                    ofile<<"NO CURRENT SCOPE"<<endl;
+                    break;
+                }
                 string t_id;
                 SymbolInfo* si;
                 si = symbolTable->lookup(cmd[1], &t_id, &pos1, &pos2);
+                
                 if(si == NULL) {
                     ofile<<"Not found"<<endl;
                 } else {
@@ -82,12 +89,16 @@ int main() {
             }
 
             case 'D': {
+                if(symbolTable->getCurrentScopeTable() == NULL) {
+                    ofile<<"NO CURRENT SCOPE"<<endl;
+                    break;
+                }
                 if(symbolTable->remove(cmd[1], &pos1, &pos2)) {
                     ofile<<"Found in ScopeTable# "<<symbolTable->getCurrentID()<<" at position "<<pos1<<", "<<pos2<<""<<endl;
                     ofile<<"Deleted Entry "<<pos1<<", "<<pos2<<" from current ScopeTable"<<endl;
                 } else {
                     ofile<<"Not found"<<endl;
-                    
+                    ofile<<cmd[1]<<" not found"<<endl;
                 }
                 break;
             }
@@ -108,8 +119,16 @@ int main() {
             }
 
             case 'E': {
+                if(symbolTable->getCurrentScopeTable() == NULL) {
+                    ofile<<"NO CURRENT SCOPE"<<endl;
+                    break;
+                }
                 ofile<<"ScopeTable with id "<<symbolTable->getCurrentID()<<" removed"<<endl;
+                if(symbolTable->getCurrentID() == "1") {
+                    ofile<<"Destroying the First Scope"<<endl;
+                }
                 symbolTable->exitScope();
+                ofile<<"Destroying the ScopeTable"<<endl;
                 break;
             }
 
@@ -117,4 +136,9 @@ int main() {
                 ofile<<"Unknown command"<<endl;
         }
     }
+
+    ifile.close();
+    ofile.close();
+    delete symbolTable;
+    return 0;
 }
