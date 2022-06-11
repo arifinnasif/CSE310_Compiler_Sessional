@@ -112,7 +112,7 @@ class ScopeTable {
             }
             if(pos1 != NULL) *pos1 = -1;
             if(pos2 != NULL) *pos2 = -1;
-            //os<<"<"<<arg_name<<","<<arg_type<<"> already exists in current ScopeTable"<<endl;
+            //os<<"<"<<arg_name<<", "<<arg_type<<"> already exists in current ScopeTable"<<endl;
             return false;
         }
 
@@ -165,13 +165,14 @@ class ScopeTable {
             //     os<<"ScopeTable # "<<absolute_id<<endl;
             // }
             for(int i = 0; i < n; i++) {
+                if(buckets[i] == NULL) continue;
                 arg<<i<<" --> ";
                 // if(&arg != &os) {
                 //     os<<i<<" --> ";
                 // }
                 SymbolInfo* temp = buckets[i];
                 while(temp != NULL) {
-                    arg<<" < "<<temp->getName()<<" : "<<temp->getType()<<">";
+                    arg<<" <"<<temp->getName()<<" : "<<temp->getType()<<">";
                     // if(&arg != &os) {
                     //     os<<" < "<<temp->getName()<<" : "<<temp->getType()<<">";
                     // }

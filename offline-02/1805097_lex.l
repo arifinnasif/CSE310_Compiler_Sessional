@@ -177,7 +177,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <CHAR_STATE>"\\"{DIGIT}+ {
     string temp(yytext);
-    temp = temp.substr(1,temp.size()-1);
+    temp = temp.substr(1, temp.size()-1);
     unsigned num = stoi(temp, nullptr, 8);
     char_buff+=yytext;
     if (num > 0xFF) {
@@ -195,7 +195,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <CHAR_STATE>"\\x"{DIGIT}+ {
     string temp(yytext);
-    temp = temp.substr(1,temp.size()-1);
+    temp = temp.substr(1, temp.size()-1);
     unsigned num = stoi(temp, nullptr, 16);
     char_buff+=yytext;
     if (num > 0xFF) {
@@ -211,6 +211,13 @@ ALPHANUM [a-zA-Z_0-9]
     }
 }
 
+<CHAR_STATE>"\\". {
+    // if escape secuence dont match then use the char followed by \ and ignore the \
+    char_len++;
+    char_buff+=yytext;
+    chars.append(1,  yytext[1]);
+}
+
 <CHAR_STATE>"'" {
     char_buff+="'";
     if(char_len == 0) {
@@ -220,8 +227,8 @@ ALPHANUM [a-zA-Z_0-9]
         log_stream<<"Error at line no "<<line_count<<": Multi character constant error "<<char_buff<<endl;
         error_count++;
     } else {
-        log_stream<<"Line no "<<line_count<<": Token <" << "CHAR_CONST" << "> Lexeme "<< chars <<" found"<<endl;
-	    token_stream<<"<"<< "CHAR_CONST" << ", " << chars <<"> ";
+        log_stream<<"Line no "<<line_count<<": Token <" << "CONST_CHAR" << "> Lexeme "<< char_buff <<" found --> <CONST_CHAR,  "<<chars<<">"<<endl;
+	    token_stream<<"<"<< "CONST_CHAR" << ", " << chars <<"> ";
         if (symbolTable->insert(char_buff, "CHAR_CONST")) {
             symbolTable->printAllScopeTable(log_stream);
         } else {
@@ -435,7 +442,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <STR_STATE>"\\"{DIGIT}+ {
     string temp(yytext);
-    temp = temp.substr(1,temp.size()-1);
+    temp = temp.substr(1, temp.size()-1);
     unsigned num = stoi(temp, nullptr, 8);
     str_buff+=yytext;
     if (num > 0xFF) {
@@ -452,7 +459,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <STR_STATE>"\\x"{DIGIT}+ {
     string temp(yytext);
-    temp = temp.substr(1,temp.size()-1);
+    temp = temp.substr(1, temp.size()-1);
     unsigned num = stoi(temp, nullptr, 16);
     str_buff+=yytext;
     if (num > 0xFF) {
@@ -467,10 +474,17 @@ ALPHANUM [a-zA-Z_0-9]
     }
 }
 
+<STR_STATE>"\\". {
+    // if escape secuence dont match then use the char followed by \ and ignore the \
+    str_len++;
+    str_buff+=yytext;
+    str.append(1, yytext[1]);
+}
+
 <STR_STATE>"\"" {
     str_buff+=yytext;
     log_stream<<"Line no "<< line_count - str_nl_count <<": Token <STRING> Lexeme "<< str_buff <<" found --> <STRING, \""<< str <<"\">" << endl;
-    token_stream<<"<STRING, "<<str<<"> ";
+    token_stream<<"<STRING, \""<<str<<"\"> ";
     str_buff.clear();
     str.clear();
     str_len = 0;
@@ -550,14 +564,14 @@ ALPHANUM [a-zA-Z_0-9]
 
 %%
 
-int main(int argc,char *argv[]){
+int main(int argc, char *argv[]){
 
 	if(argc!=2){
 		printf("Please provide input file name and try again\n");
 		return 0;
 	}
 
-	FILE *fin=fopen(argv[1],"r");
+	FILE *fin=fopen(argv[1], "r");
 	if(fin==NULL){
 		printf("Cannot open specified file\n");
 		return 0;
@@ -567,6 +581,8 @@ int main(int argc,char *argv[]){
 
 	yyin= fin;
 	yylex();
+
+    symbolTable->printAllScopeTable(log_stream);
 
     log_stream<<"Total lines: "<<line_count<<endl;
     log_stream<<"Total errors: "<<error_count<<endl;
