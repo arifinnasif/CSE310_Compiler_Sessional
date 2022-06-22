@@ -17,8 +17,8 @@
     int line_count=1;
     int error_count = 0;
 
-    string LOG_FILENAME = "log.txt";
-    string TOKEN_FILENAME = "token.txt";
+    string LOG_FILENAME = "1805097_log.txt";
+    string TOKEN_FILENAME = "1805097_token.txt";
 
     ofstream log_stream(LOG_FILENAME);
     ofstream token_stream(TOKEN_FILENAME);
@@ -62,39 +62,39 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 "if"|"for"|"do"|"int"|"float"|"void"|"switch"|"default"|"else"|"while"|"break"|"char"|"double"|"return"|"case"|"continue" {
-	log_stream<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
+	log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< to_upper(yytext) <<"> ";
 }
 
 
 {DIGIT}+ {
-	log_stream<<"Line no "<<line_count<<": Token <" << "CONST_INT" << "> Lexeme "<< yytext <<" found"<<endl;
+	log_stream<<endl<<"Line no "<<line_count<<": Token <" << "CONST_INT" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "CONST_INT" << ", " << yytext <<"> ";
     if (symbolTable->insert(yytext, "CONST_INT")) {
         symbolTable->printAllScopeTable(log_stream);
     } else {
-        log_stream<< yytext << " already exists in current ScopeTable" << endl;
+        log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
     }
 
 }
 
-{DIGIT}*(\.{DIGIT}+)?(E[\+\-]?{DIGIT}+)? {
-    log_stream<<"Line no "<<line_count<<": Token <" << "CONST_FLOAT" << "> Lexeme "<< yytext <<" found"<<endl;
+{DIGIT}*(\.{DIGIT}*)?(E[\+\-]?{DIGIT}+)? {
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "CONST_FLOAT" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "CONST_FLOAT" << ", " << yytext <<"> ";
     if (symbolTable->insert(yytext, "CONST_FLOAT")) {
         symbolTable->printAllScopeTable(log_stream);
     } else {
-        log_stream<< yytext << " already exists in current ScopeTable" << endl;
+        log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
     }
 }
 
 {DIGIT}*(\.{DIGIT}*)(\.{DIGIT}*)+{ALPHANUM}* {
-    log_stream<<"Error at line no "<< line_count <<": Too many decimal points "<<yytext<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Too many decimal points "<<yytext<<endl;
     error_count++;
 }
 
 {DIGIT}*(\.{DIGIT}+)?(E[\+\-]?{ALPHANUM}*(\.{ALPHANUM}*)+) {
-    log_stream<<"Error at line no "<< line_count <<": Ill formed number "<<yytext<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Ill formed number "<<yytext<<endl;
     error_count++;
 }
 
@@ -107,7 +107,7 @@ ALPHANUM [a-zA-Z_0-9]
 }
 
 <CHAR_STATE>(\r)?\n {
-    log_stream<<"Error at line no "<< line_count <<": Unterminated character "<<char_buff<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Unterminated character "<<char_buff<<endl;
     error_count++;
     char_buff.clear();
     chars.clear();
@@ -116,7 +116,7 @@ ALPHANUM [a-zA-Z_0-9]
 }
 
 <CHAR_STATE><<EOF>> {
-    log_stream<<"Error at line no "<< line_count <<": Unterminated character "<<char_buff<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Unterminated character "<<char_buff<<endl;
     error_count++;
     char_buff.clear();
     chars.clear();
@@ -182,7 +182,7 @@ ALPHANUM [a-zA-Z_0-9]
     char_buff+=yytext;
     if (num > 0xFF) {
         // recheck. what should you do when you cannot put it in one byte
-        log_stream<<"Error at line no "<< line_count <<": Multi character constant error "<<char_buff<<endl;
+        log_stream<<endl<<"Error at line no "<< line_count <<": Multi character constant error "<<char_buff<<endl;
         error_count++;
         char_buff.clear();
         chars.clear();
@@ -200,7 +200,7 @@ ALPHANUM [a-zA-Z_0-9]
     char_buff+=yytext;
     if (num > 0xFF) {
         // recheck. what should you do when you cannot put it in one byte
-        log_stream<<"Error at line no "<< line_count <<": Multi character constant error "<<char_buff<<endl;
+        log_stream<<endl<<"Error at line no "<< line_count <<": Multi character constant error "<<char_buff<<endl;
         error_count++;
         char_buff.clear();
         chars.clear();
@@ -221,18 +221,18 @@ ALPHANUM [a-zA-Z_0-9]
 <CHAR_STATE>"'" {
     char_buff+="'";
     if(char_len == 0) {
-        log_stream<<"Error at line no "<<line_count<<": Empty character constant error ''"<<endl;
+        log_stream<<endl<<"Error at line no "<<line_count<<": Empty character constant error ''"<<endl;
         error_count++;
     } else if(char_len > 1) {
-        log_stream<<"Error at line no "<<line_count<<": Multi character constant error "<<char_buff<<endl;
+        log_stream<<endl<<"Error at line no "<<line_count<<": Multi character constant error "<<char_buff<<endl;
         error_count++;
     } else {
-        log_stream<<"Line no "<<line_count<<": Token <" << "CONST_CHAR" << "> Lexeme "<< char_buff <<" found --> <CONST_CHAR,  "<<chars<<">"<<endl;
+        log_stream<<endl<<"Line no "<<line_count<<": Token <" << "CONST_CHAR" << "> Lexeme "<< char_buff <<" found --> <CONST_CHAR,  "<<chars<<">"<<endl;
 	    token_stream<<"<"<< "CONST_CHAR" << ", " << chars <<"> ";
         if (symbolTable->insert(char_buff, "CHAR_CONST")) {
             symbolTable->printAllScopeTable(log_stream);
         } else {
-            log_stream<< char_buff << " already exists in current ScopeTable" << endl;
+            log_stream<<endl<< char_buff << " already exists in current ScopeTable" << endl;
         }
     }
 
@@ -249,78 +249,78 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 "++"|"--" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "INCOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "INCOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "INCOP" << ", " << yytext <<"> ";
 }
 
 "+"|"-" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "ADDOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "ADDOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "ADDOP" << ", " << yytext <<"> ";
 }
 
 "*"|"/"|"%" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "MULOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "MULOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "MULOP" << ", " << yytext <<"> ";
 }
 
 "<"|"<="|">"|">="|"=="|"!=" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "RELOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RELOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "RELOP" << ", " << yytext <<"> ";
 }
 
 "=" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "ASSIGNOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "ASSIGNOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "ASSIGNOP" << ", " << yytext <<"> ";
 }
 
 "&&"|"||" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "LOGICOP" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LOGICOP" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "LOGICOP" << ", " << yytext <<"> ";
 }
 
 "!" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "NOT" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "NOT" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "NOT" << ", " << yytext <<"> ";
 }
 
 "(" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "LPAREN" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LPAREN" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "LPAREN" << ", " << yytext <<"> ";
 }
 
 ")" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "RPAREN" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RPAREN" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "RPAREN" << ", " << yytext <<"> ";
 }
 
 "[" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "LTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "LTHIRD" << ", " << yytext <<"> ";
 }
 
 "]" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "RTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "RTHIRD" << ", " << yytext <<"> ";
 }
 
 "," {
-    log_stream<<"Line no "<<line_count<<": Token <" << "COMMA" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "COMMA" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "COMMA" << ", " << yytext <<"> ";
 }
 
 ";" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "SEMICOLON" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "SEMICOLON" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "SEMICOLON" << ", " << yytext <<"> ";
 }
 
 "{" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "LCURL" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LCURL" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "LCURL" << ", " << yytext <<"> ";
     symbolTable->enterScope();
 }
 
 "}" {
-    log_stream<<"Line no "<<line_count<<": Token <" << "RCURL" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RCURL" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "RCURL" << ", " << yytext <<"> ";
     symbolTable->exitScope();
 }
@@ -336,18 +336,18 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 {LETTER}+{ALPHANUM}* {
-    log_stream<<"Line no "<<line_count<<": Token <" << "ID" << "> Lexeme "<< yytext <<" found"<<endl;
+    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "ID" << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< "ID" << ", " << yytext <<"> ";
     if (symbolTable->insert(yytext, "ID")) {
         symbolTable->printAllScopeTable(log_stream);
     } else {
-        log_stream<< yytext << " already exists in current ScopeTable" << endl;
+        log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
     }
 }
 
 
 {ALPHANUM}+ {
-    log_stream<<"Error at line no "<< line_count <<": Invalid prefix on ID or invalid suffix on Number "<< yytext <<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Invalid prefix on ID or invalid suffix on Number "<< yytext <<endl;
     error_count++;
 }
 
@@ -361,7 +361,7 @@ ALPHANUM [a-zA-Z_0-9]
 }
 
 <STR_STATE>(\r)?\n {
-    log_stream<<"Error at line no "<< line_count - str_nl_count <<": Unterminated String "<<str_buff<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count - str_nl_count <<": Unterminated String "<<str_buff<<endl;
     error_count++;
     str_buff.clear();
     str.clear();
@@ -378,7 +378,7 @@ ALPHANUM [a-zA-Z_0-9]
 }
 
 <STR_STATE><<EOF>> {
-    log_stream<<"Error at line no "<< line_count - str_nl_count <<": Unterminated String "<<char_buff<<endl;
+    log_stream<<endl<<"Error at line no "<< line_count - str_nl_count <<": Unterminated String "<<str_buff<<endl;
     error_count++;
     str_buff.clear();
     str.clear();
@@ -447,7 +447,7 @@ ALPHANUM [a-zA-Z_0-9]
     str_buff+=yytext;
     if (num > 0xFF) {
         // recheck. what should you do when you cannot put it in one byte
-        log_stream<<"Error at line no "<< line_count - str_nl_count <<": Multi character constant error "<<str_buff<<endl;
+        log_stream<<endl<<"Error at line no "<< line_count - str_nl_count <<": Multi character constant error "<<str_buff<<endl;
         error_count++;
         str_buff.clear();
         BEGIN INITIAL;
@@ -464,7 +464,7 @@ ALPHANUM [a-zA-Z_0-9]
     str_buff+=yytext;
     if (num > 0xFF) {
         // recheck. what should you do when you cannot put it in one byte
-        log_stream<<"Error at line no "<< line_count - str_nl_count <<": Multi character constant error "<<str_buff<<endl;
+        log_stream<<endl<<"Error at line no "<< line_count - str_nl_count <<": Multi character constant error "<<str_buff<<endl;
         error_count++;
         str_buff.clear();
         BEGIN INITIAL;
@@ -483,7 +483,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <STR_STATE>"\"" {
     str_buff+=yytext;
-    log_stream<<"Line no "<< line_count - str_nl_count <<": Token <STRING> Lexeme "<< str_buff <<" found --> <STRING, \""<< str <<"\">" << endl;
+    log_stream<<endl<<"Line no "<< line_count - str_nl_count <<": Token <STRING> Lexeme "<< str_buff <<" found --> <STRING, \""<< str <<"\">" << endl;
     token_stream<<"<STRING, \""<<str<<"\"> ";
     str_buff.clear();
     str.clear();
@@ -513,7 +513,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 <SL_COMMENT_STATE>(\r)?(\n) {
     BEGIN INITIAL;
-    log_stream<<"Line no "<< line_count - sl_nl_count <<": Token <COMMENT> Lexeme "<<sl_comment_buff<<" found"<<endl;
+    log_stream<<endl<<"Line no "<< line_count - sl_nl_count <<": Token <COMMENT> Lexeme "<<sl_comment_buff<<" found"<<endl;
     sl_nl_count=0;
     sl_comment_buff.clear();
     line_count++;
@@ -538,14 +538,14 @@ ALPHANUM [a-zA-Z_0-9]
 
 <ML_COMMENT_STATE>"*/" {
     ml_comment_buff+=yytext;
-    log_stream<<"Line no "<< line_count - ml_nl_count <<": Token <COMMENT> Lexeme "<<ml_comment_buff<<" found"<<endl;
+    log_stream<<endl<<"Line no "<< line_count - ml_nl_count <<": Token <COMMENT> Lexeme "<<ml_comment_buff<<" found"<<endl;
     ml_comment_buff.clear();
     ml_nl_count++;
     BEGIN INITIAL;
 }
 
 <ML_COMMENT_STATE><<EOF>> {
-    log_stream<<"Error at line no "<<line_count-ml_nl_count<<": Unterminated Comment "<<ml_comment_buff<<endl;
+    log_stream<<endl<<"Error at line no "<<line_count-ml_nl_count<<": Unterminated Comment "<<ml_comment_buff<<endl;
     error_count++;
     ml_comment_buff.clear();
     ml_nl_count = 0;
@@ -558,7 +558,7 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 . {
-    log_stream<<"Error at line no "<< line_count <<": Unrecognized character "<< yytext <<endl;
+    log_stream<<endl<<"Error at line no "<< line_count <<": Unrecognized character "<< yytext <<endl;
     error_count++;
 }
 
@@ -584,7 +584,7 @@ int main(int argc, char *argv[]){
 
     symbolTable->printAllScopeTable(log_stream);
 
-    log_stream<<"Total lines: "<<line_count<<endl;
+    log_stream<<endl<<"Total lines: "<<line_count<<endl;
     log_stream<<"Total errors: "<<error_count<<endl;
 	fclose(yyin);
     log_stream.close();
