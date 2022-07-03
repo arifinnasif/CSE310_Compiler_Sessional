@@ -9,14 +9,26 @@ class SymbolInfo {
     private:
         string name;
         string type;
+
+        string datatype;
+
+        bool _isArray;
+        int arraySize;
+        bool _isFunction;
+        bool _isFunctionDefined;
         SymbolInfo * prev;
         SymbolInfo * next;
         SymbolInfo ** head;
 
     public:
-        SymbolInfo(string argName, string argType, SymbolInfo ** argHead, SymbolInfo * argPrev, SymbolInfo * argNext);
+        bool isError;
+        SymbolInfo(string argName, string argType, SymbolInfo ** argHead = NULL, SymbolInfo * argPrev  = NULL, SymbolInfo * argNext  = NULL);
 
         ~SymbolInfo();
+
+        void setDataType(string arg);
+
+        string getDataType();
 
         string getName();
 
@@ -33,6 +45,18 @@ class SymbolInfo {
         SymbolInfo * getPrev();
 
         void setPrev(SymbolInfo * arg);
+
+        void setAsArray(int sz);
+
+        void setAsFunction();
+
+        void setAsFunctionDefined();
+
+        bool isArray();
+        bool isFunction();
+        bool isFunctionDefined();
+
+        int getArraySize();
 
 };
 

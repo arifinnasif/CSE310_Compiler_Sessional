@@ -7,9 +7,11 @@
 
 %{
     #include "lib/src/SymbolTable/1805097_SymbolTable.h"
+    #include "lib/src/util/NonTerminalInfo.h"
     #include "y.tab.h"
     #include <bits/stdc++.h>
     #include <fstream>
+    #include <vector>
 
     #define BUCKET_SIZE 7
 
@@ -18,13 +20,17 @@
     int line_count=1;
     int error_count = 0;
 
-    string LOG_FILENAME = "1805097_log.txt";
-    string TOKEN_FILENAME = "1805097_token.txt";
+    // string LOG_FILENAME = "1805097_log.txt";
+    // string TOKEN_FILENAME = "1805097_token.txt";
 
-    ofstream log_stream(LOG_FILENAME);
-    ofstream token_stream(TOKEN_FILENAME);
+    // ofstream log_stream(LOG_FILENAME);
+    // ofstream token_stream(TOKEN_FILENAME);
 
-    SymbolTable * symbolTable;
+    extern ofstream log_stream;
+    extern ofstream token_stream;
+
+    // extern YYSTYPE yylval;
+    extern SymbolTable * symbolTable;
 
     string char_buff;
     string chars;
@@ -61,22 +67,44 @@ ALPHANUM [a-zA-Z_0-9]
 	// do nothing
 }
 
+"int" {
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< to_upper(yytext) <<"> ";
 
-"if"|"for"|"do"|"int"|"float"|"void"|"switch"|"default"|"else"|"while"|"break"|"char"|"double"|"return"|"case"|"continue" {
+    return INT;
+}
+
+"float" {
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< to_upper(yytext) <<"> ";
+
+    return FLOAT;
+}
+
+"void" {
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< to_upper(yytext) <<"> ";
+
+    return VOID;
+}
+
+"if"|"for"|"do"|"switch"|"default"|"else"|"while"|"break"|"char"|"double"|"return"|"case"|"continue" {
 	log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
 	token_stream<<"<"<< to_upper(yytext) <<"> ";
 }
 
 
 {DIGIT}+ {
-	log_stream<<endl<<"Line no "<<line_count<<": Token <" << "CONST_INT" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "CONST_INT" << ", " << yytext <<"> ";
-    if (symbolTable->insert(yytext, "CONST_INT")) {
-        symbolTable->printAllScopeTable(log_stream);
+	// log_stream<<endl<<"Line no "<<line_count<<": Token <" << "CONST_INT" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "CONST_INT" << ", " << yytext <<"> ";
+    SymbolInfo* si = new SymbolInfo((string)yytext, (string)"CONST_INT");
+    if (symbolTable->insert(si)) {
+        // symbolTable->printAllScopeTable(log_stream);
     } else {
-        log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
+        // log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
     }
-
+    yylval.symbolInfo = si;
+    return CONST_INT;
 }
 
 {DIGIT}*(\.{DIGIT}*)?(E[\+\-]?{DIGIT}+)? {
@@ -295,23 +323,31 @@ ALPHANUM [a-zA-Z_0-9]
 }
 
 "[" {
-    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "LTHIRD" << ", " << yytext <<"> ";
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << "LTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "LTHIRD" << ", " << yytext <<"> ";
+
+    return LTHIRD;
 }
 
 "]" {
-    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "RTHIRD" << ", " << yytext <<"> ";
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << "RTHIRD" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "RTHIRD" << ", " << yytext <<"> ";
+
+    return RTHIRD;
 }
 
 "," {
-    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "COMMA" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "COMMA" << ", " << yytext <<"> ";
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << "COMMA" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "COMMA" << ", " << yytext <<"> ";
+
+    return COMMA;
 }
 
 ";" {
-    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "SEMICOLON" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "SEMICOLON" << ", " << yytext <<"> ";
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << "SEMICOLON" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "SEMICOLON" << ", " << yytext <<"> ";
+
+    return SEMICOLON;
 }
 
 "{" {
@@ -337,13 +373,17 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 {LETTER}+{ALPHANUM}* {
-    log_stream<<endl<<"Line no "<<line_count<<": Token <" << "ID" << "> Lexeme "<< yytext <<" found"<<endl;
-	token_stream<<"<"<< "ID" << ", " << yytext <<"> ";
-    if (symbolTable->insert(yytext, "ID")) {
-        symbolTable->printAllScopeTable(log_stream);
-    } else {
-        log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
-    }
+    // log_stream<<endl<<"Line no "<<line_count<<": Token <" << "ID" << "> Lexeme "<< yytext <<" found"<<endl;
+	// token_stream<<"<"<< "ID" << ", " << yytext <<"> ";
+
+    // if (symbolTable->insert(yytext, "ID")) {
+    //     // symbolTable->printAllScopeTable(log_stream);
+    // } else {
+    //     // log_stream<<endl<< yytext << " already exists in current ScopeTable" << endl;
+    // }
+
+    yylval.symbolInfo = new SymbolInfo(yytext, "ID");
+    return ID;
 }
 
 

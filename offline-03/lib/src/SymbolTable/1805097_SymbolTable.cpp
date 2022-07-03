@@ -1,4 +1,5 @@
 #include "1805097_SymbolTable.h"
+#include "1805097_SymbolInfo.h"
 
 using namespace std;
 
@@ -33,6 +34,10 @@ bool SymbolTable::insert(string arg_name, string arg_type, int * pos1, int * pos
     return this->currentScopeTable->insert(arg_name, arg_type, pos1, pos2);
 }
 
+bool SymbolTable::insert(SymbolInfo* symbolInfo) {
+    return this->insert(symbolInfo->getName(), symbolInfo->getType());
+}
+
 bool SymbolTable::remove(string arg, int * pos1, int * pos2) {
     if(this->currentScopeTable == NULL) {
         return false;
@@ -53,6 +58,15 @@ SymbolInfo * SymbolTable::lookup(string arg, string* tableID, int * pos1, int * 
         }
         temp_sc = temp_sc->getParentScopeTable();
     }
+    if(tableID != NULL) *tableID = "";
+    return NULL;
+}
+
+SymbolInfo * SymbolTable::lookupCurrent(string arg, string* tableID, int * pos1, int * pos2) {
+    if(this->currentScopeTable == NULL) {
+        return NULL;
+    }
+    return this->currentScopeTable->lookup(arg, pos1, pos2);
     if(tableID != NULL) *tableID = "";
     return NULL;
 }
@@ -88,3 +102,4 @@ string SymbolTable::getCurrentID() {
     }
     return this->currentScopeTable->getAbsoluteID();
 }
+
