@@ -11,6 +11,10 @@ SymbolInfo::SymbolInfo(string argName, string argType, SymbolInfo ** argHead, Sy
     this->next = argNext;
 
     this->isError = false;
+    this->_isArray = false;
+    int arraySize = -1;
+    this->_isFunction = false;
+    this->_isFunctionDefined = false;
 
     if(argPrev != NULL)
         argPrev->next = this;
@@ -26,6 +30,10 @@ SymbolInfo::~SymbolInfo() {
         *head = this->next;
     if(next != NULL)
         next->setPrev(this->prev);
+}
+
+void SymbolInfo::setHead(SymbolInfo** argHead) {
+    this->head = argHead;
 }
 
 string SymbolInfo::getDataType() {
@@ -97,3 +105,4 @@ bool SymbolInfo::isFunctionDefined() {
 int SymbolInfo::getArraySize() {
     return this->arraySize;
 }
+

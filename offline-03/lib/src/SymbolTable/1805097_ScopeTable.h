@@ -29,11 +29,15 @@ class ScopeTable {
         
 
     public:
+        ScopeTable(int arg_n);
+
         ScopeTable(int arg_n, ScopeTable * argParentScopeTable);
 
         ~ScopeTable();
 
         bool insert(string arg_name, string arg_type, int * pos1 = NULL, int * pos2 = NULL);
+
+        bool insert(SymbolInfo * argSymbolInfo, int * pos1 = NULL, int * pos2 = NULL);
 
         SymbolInfo * lookup(string arg, int * pos1 = NULL, int * pos2 = NULL);
 
@@ -44,6 +48,10 @@ class ScopeTable {
         void print(ostream & arg = cout);
 
         ScopeTable * getParentScopeTable();
+
+        void setParentScopeTable(ScopeTable * argParentScopeTable);
+
+        int getBucketSize();
 };
 
 

@@ -1,11 +1,14 @@
 #include "1805097_SymbolTable.h"
+#include "1805097_ScopeTable.h"
 #include "1805097_SymbolInfo.h"
+#include <cstdlib>
 
 using namespace std;
 
 SymbolTable::SymbolTable(int arg) {
     this->n = arg;
     this->currentScopeTable = new ScopeTable(n, NULL);
+    this->prebuiltScopeTable = NULL;
 }
 
 SymbolTable::~SymbolTable() {
@@ -15,10 +18,26 @@ SymbolTable::~SymbolTable() {
         currentScopeTable = currentScopeTable->getParentScopeTable();
         delete temp_st;
     }
+
+    if(prebuiltScopeTable != NULL) delete prebuiltScopeTable;
 }
 
 void SymbolTable::enterScope() {
-    this->currentScopeTable = new ScopeTable(n, this->currentScopeTable);
+    if(prebuiltScopeTable != NULL) {
+        if(prebuiltScopeTable->getBucketSize() != this->n) {
+            cerr<<"[CRITICAL ERROR] prebuiltScopeTable have different BUCKET_SIZE. EXITING...";
+            exit(1);
+        }
+
+        prebuiltScopeTable->setParentScopeTable(this->currentScopeTable);
+        this->currentScopeTable = prebuiltScopeTable;
+
+        prebuiltScopeTable = NULL;
+        // cout<<"using pre built"<<endl;
+    } else {
+        // cout<<"not using pre built"<<endl;
+        this->currentScopeTable = new ScopeTable(n, this->currentScopeTable);
+    }
 }
 
 void SymbolTable::exitScope() {
@@ -35,7 +54,10 @@ bool SymbolTable::insert(string arg_name, string arg_type, int * pos1, int * pos
 }
 
 bool SymbolTable::insert(SymbolInfo* symbolInfo) {
-    return this->insert(symbolInfo->getName(), symbolInfo->getType());
+    if(this->currentScopeTable == NULL) {
+        this->currentScopeTable = new ScopeTable(n, NULL);
+    }
+    return this->currentScopeTable->insert(symbolInfo);
 }
 
 bool SymbolTable::remove(string arg, int * pos1, int * pos2) {
@@ -93,6 +115,19 @@ void SymbolTable::printAllScopeTable(ostream & arg) {
 
 ScopeTable * SymbolTable::getCurrentScopeTable() {
     return this->currentScopeTable;
+}
+
+void SymbolTable::replaceCurrentScopeTable(ScopeTable* arg) {
+    arg->setParentScopeTable(this->currentScopeTable->getParentScopeTable());
+    this->currentScopeTable = arg;
+}
+
+void SymbolTable::setPrebuiltScopeTable(ScopeTable *arg) {
+    // if(arg) cout<<"setPrebuiltScopeTable not null";
+    if(arg && arg->getBucketSize() != this->n) {
+        cerr<<"[WARNING] new prebuiltScopeTable have different BUCKET_SIZE"<<endl;
+    }
+    this->prebuiltScopeTable = arg;
 }
 
 

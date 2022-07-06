@@ -1,7 +1,7 @@
 CC			= g++
 CXXFLAGS	= -g -w -std=c++17
 YC			= yacc
-YCFLAGS		= -d
+YCFLAGS		= -d -Wcounterexamples
 LC			= flex
 LCFLAGS		=
 

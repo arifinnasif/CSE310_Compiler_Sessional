@@ -13,6 +13,7 @@ class SymbolTable {
     private:
         ScopeTable * currentScopeTable;
         int n;
+        ScopeTable * prebuiltScopeTable; // will set new scope table will be set as prebuiltScopeTable (if not NULL) when enterScope() is called
     public:
         SymbolTable(int arg);
 
@@ -37,6 +38,10 @@ class SymbolTable {
         void printAllScopeTable(ostream & arg = cout);
 
         ScopeTable * getCurrentScopeTable();
+
+        void replaceCurrentScopeTable(ScopeTable* arg);
+
+        void setPrebuiltScopeTable(ScopeTable* arg);
 
 
         string getCurrentID();

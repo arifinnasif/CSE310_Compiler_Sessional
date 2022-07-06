@@ -1,4 +1,5 @@
 #include "1805097_ScopeTable.h"
+#include "1805097_SymbolInfo.h"
 
 using namespace std;
 
@@ -19,7 +20,18 @@ uint32_t ScopeTable::hash(string arg) {
 }
 
 
-        
+ScopeTable::ScopeTable(int arg_n) {
+
+            
+    this->n = arg_n;
+    this->buckets = new SymbolInfo * [n]();
+    this->parentScopeTable = NULL;
+    this->childCount = 0;
+
+            
+    // cout<<hash("foo")<<endl;
+    // os<<"New ScopeTable with id "<<getAbsoluteID()<<" created"<<endl;
+}        
 
 
 ScopeTable::ScopeTable(int arg_n, ScopeTable * argParentScopeTable) {
@@ -69,6 +81,44 @@ bool ScopeTable::insert(string arg_name, string arg_type, int * pos1, int * pos2
         cnt++;
         if(temp->getNext() == NULL) {
             temp->setNext(new SymbolInfo(arg_name, arg_type, &buckets[h], temp, NULL));
+            if(pos1 != NULL) *pos1 = h;
+            if(pos2 != NULL) *pos2 = cnt;
+            //os<<"Inserted in ScopeTable# "<<getAbsoluteID()<<" at position "<<h<<", "<<cnt<<""<<endl;
+            return true;
+        }
+        temp = temp->getNext();
+    }
+    if(pos1 != NULL) *pos1 = -1;
+    if(pos2 != NULL) *pos2 = -1;
+    //os<<"<"<<arg_name<<", "<<arg_type<<"> already exists in current ScopeTable"<<endl;
+    return false;
+}
+
+bool ScopeTable::insert(SymbolInfo * argSymbolInfo, int * pos1, int * pos2) {
+    uint32_t h = hash(argSymbolInfo->getName());
+    int cnt = 0;
+    
+    if(buckets[h] == NULL) {
+        argSymbolInfo->setHead(&buckets[h]);
+        argSymbolInfo->setPrev(NULL);
+        argSymbolInfo->setNext(NULL);
+        buckets[h] = argSymbolInfo;
+
+        // cout<<"INSERT TO NEW BUCKET"<<endl;
+        
+        if(pos1 != NULL) *pos1 = h;
+        if(pos2 != NULL) *pos2 = cnt;
+        //os<<"Inserted in ScopeTable# "<<getAbsoluteID()<<" at position "<<h<<", "<<cnt<<""<<endl;
+        return true;
+    }
+    SymbolInfo * temp = buckets[h];
+    while(temp->getName().compare(argSymbolInfo->getName()) != 0) {
+        cnt++;
+        if(temp->getNext() == NULL) {
+            argSymbolInfo->setHead(&buckets[h]);
+            argSymbolInfo->setPrev(temp);
+            argSymbolInfo->setNext(NULL);
+            temp->setNext(argSymbolInfo);
             if(pos1 != NULL) *pos1 = h;
             if(pos2 != NULL) *pos2 = cnt;
             //os<<"Inserted in ScopeTable# "<<getAbsoluteID()<<" at position "<<h<<", "<<cnt<<""<<endl;
@@ -153,4 +203,16 @@ void ScopeTable::print(ostream & arg) {
 
 ScopeTable * ScopeTable::getParentScopeTable() {
     return parentScopeTable;
+}
+
+void ScopeTable::setParentScopeTable(ScopeTable * argParentScopeTable){
+    if(argParentScopeTable == NULL)
+        this->id = ROOT_ID;
+    else
+        this->id = ++(argParentScopeTable->childCount);
+    this->parentScopeTable = argParentScopeTable;
+}
+
+int ScopeTable::getBucketSize() {
+    return n;
 }

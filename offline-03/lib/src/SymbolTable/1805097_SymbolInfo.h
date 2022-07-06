@@ -2,6 +2,7 @@
 #define _1805097_SYMBOLINFO_H
 
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -10,7 +11,7 @@ class SymbolInfo {
         string name;
         string type;
 
-        string datatype;
+        
 
         bool _isArray;
         int arraySize;
@@ -22,9 +23,17 @@ class SymbolInfo {
 
     public:
         bool isError;
+
+        string datatype;
+        int int_val;
+        double float_val;
+
+        vector<string> arglist;
         SymbolInfo(string argName, string argType, SymbolInfo ** argHead = NULL, SymbolInfo * argPrev  = NULL, SymbolInfo * argNext  = NULL);
 
         ~SymbolInfo();
+
+        void setHead(SymbolInfo** argHead);
 
         void setDataType(string arg);
 
