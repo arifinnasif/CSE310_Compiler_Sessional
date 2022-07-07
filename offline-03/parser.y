@@ -36,6 +36,37 @@ void yyerror(const char *s)
 	error_stream<<"Error at line "<<line_count<<": "<<(string)s<<endl<<endl;
 }
 
+vector<string> split(string str,   char delim) {
+    int i=0;
+    int start=0;
+
+    vector<string> tkn;
+
+
+    while(str[i] && str[i] != '\r') {
+        if(str[i]!=delim) {
+            if(i==0||str[i-1]==delim) start=i;
+            if(str[i+1]=='\0' || str[i+1]=='\r' || str[i+1]==delim) {
+                tkn.push_back(str.substr(start,   i-start+1));
+            }
+        }
+        i++;
+    }
+
+    return tkn;
+}
+
+string trim(string arg) {
+	string _whitespace = " \t\f\v\n\r";
+	string str = arg.substr(arg.find_first_not_of(_whitespace));
+	size_t found = str.find_last_not_of(_whitespace);
+	if (found!=string::npos)
+	    str.erase(found+1);
+  	else
+    	str.clear();
+	return str;
+}
+
 void log(string type, string message) {
 	if(type == "production") {
 		// cout<<message<<endl;
@@ -413,7 +444,7 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
 
-		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " ) \n" + $7->name; // not $6 because https://www.gnu.org/software/bison/manual/bison.html#Midrule-Actions
+		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " ) " + $7->name; // not $6 because https://www.gnu.org/software/bison/manual/bison.html#Midrule-Actions
 
 		log("matched", $$->name);
 	}
@@ -469,7 +500,7 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("production", "func_definition : type_specifier ID LPAREN RPAREN compound_statement");
 
-		$$->name = $1->name+" "+$2->getName()+" ( )\n" + $6->name;
+		$$->name = $1->name+" "+$2->getName()+" ( ) " + $6->name;
 
 		log("matched", $$->name);
 	}
@@ -577,17 +608,37 @@ compound_statement: LCURL {
  		    
 var_declaration: type_specifier declaration_list SEMICOLON {
 		///
-		if($1->name == "void") {
-			err("var_void", "");
-		}
+		
 
 		log("production", "var_declaration : type_specifier declaration_list SEMICOLON");
 
+		if($1->name == "void") {
+			err("var_void", "");
+			// remove all the symbols in dec_list
 
-		for(auto i : $2 -> vector_si) {
-			
-			if(!i->isError) {
-				i->setDataType($1->name);
+			for(auto i : $2 -> vector_si) {
+				if(!i->isError) { 
+					SymbolInfo* temp;
+					symbolTable->remove(i->getName());
+				
+
+					// log("debug", i->getName()+" "+i->datatype+" "+symbolTable->lookup(i->getName())->datatype+" <<<<<<<<<<<<<<<<<");
+
+				}
+			}
+		} else {
+
+
+			for(auto i : $2 -> vector_si) {
+				if(!i->isError) { 
+					// i->setDataType($1->name); line commented because of new instance of "c" in "int c[CONST_INT]; float c[CONST_INT];" creates a new SymbolInfo pointer, that may not be in the scopetable
+					SymbolInfo* temp;
+					if(temp = symbolTable->lookup(i->getName())) temp->setDataType($1->name);
+				
+
+					// log("debug", i->getName()+" "+i->datatype+" "+symbolTable->lookup(i->getName())->datatype+" <<<<<<<<<<<<<<<<<");
+
+				}
 			}
 		}
 
@@ -792,26 +843,31 @@ expression_statement: SEMICOLON	{
 	}
 	;
 	  
-variable: ID 		{
+variable: ID {
 		log("production", "variable : ID");
 
 		SymbolInfo* temp;
 
 		if((temp = symbolTable->lookup($1->getName())) == NULL) {
 			err("undec_var", $1->getName());
+			// $$->isError = true;
 
 			temp = $1;
 
 		} else if(temp->isArray()) {
 			err("tm_arr", $1->getName());
+			// $$->isError = true;
 
 		} else if(temp->isFunction()) {
 			err("tm_func", $1->getName());
+			// $$->isError = true;
 
 		} 
 
 		$$ = new NonTerminalInfo();
 		$$->setName(temp->getName());
+		
+		// log("debug")
 		$$->expr_val_type = temp->datatype;
 		if($$->expr_val_type == "int") {
 			$$->expr_int_val = temp->int_val;
@@ -828,11 +884,13 @@ variable: ID 		{
 
 		if((temp = symbolTable->lookup($1->getName())) == NULL) {
 			err("undec_var", $1->getName());
+			$$->isError = true;
 
 			temp = $1;
 
 		} else if(!temp->isArray()) {
 			err("not_arr", $1->getName());
+			$$->isError = true;
 
 		}
 
@@ -892,7 +950,7 @@ expression: logic_expression {
 			} else if($1->expr_val_type == "float") {
 				if($3->expr_val_type == "int") {
 					$1->expr_float_val = $3->expr_int_val;
-					err("float_int", "");
+					// err("float_int", "");
 
 				} else if($3->expr_val_type == "float") {
 					$1->expr_float_val = $3->expr_float_val;
@@ -909,6 +967,8 @@ expression: logic_expression {
 			
 logic_expression: rel_expression {
 		log("production", "logic_expression : rel_expression");
+
+		// log("debug", $1->name+" ==> "+$1->expr_val_type + "in logic_expression: rel_expression");
 
 		log("matched", $$->name);
 	}
@@ -942,6 +1002,8 @@ logic_expression: rel_expression {
 			
 rel_expression: simple_expression {
 		log("production", "rel_expression : simple_expression");
+
+		// log("debug", $1->name+" ==> "+$1->expr_val_type + "in rel_expression: simple_expression");
 
 		log("matched", $$->name);
 	}
@@ -986,6 +1048,8 @@ rel_expression: simple_expression {
 simple_expression: term {
 		log("production", "simple_expression : term");
 
+		// log("debug", $1->name+" ==> "+$1->expr_val_type + "simple_expression: term");
+
 		log("matched", $$->name);
 	}
 	| simple_expression ADDOP term {
@@ -1013,6 +1077,8 @@ simple_expression: term {
 					
 term: unary_expression {
 		log("production", "term : unary_expression");
+
+		// log("debug", $1->name+" ==> "+$1->expr_val_type + "in term : unary_expression");
 
 		log("matched", $$->name);
 	}
@@ -1092,6 +1158,8 @@ unary_expression: ADDOP unary_expression {
 	| factor {
 		log("production", "unary_expression : factor");
 
+		// log("debug", $1->name+" ==> "+$1->expr_val_type + "in unary expression: factor");
+
 		log("matched", $$->name);
 	}
 	;
@@ -1114,14 +1182,23 @@ factor: variable {
 		} else {
 			// is a declared function
 			$$->expr_val_type = temp->datatype;
+			// log("debug", temp->datatype);
 			if(temp->datatype == "void") {
-				$$->expr_val_type+"_func"; // to detect "void func in expr error"
+				$$->expr_val_type+="_func"; // to detect "void func in expr error"
 			}
+			// log("debug", $$->expr_val_type);
 
 			if(temp->arglist.size() == $3->vector_str.size()) {
 				for(int i = 0; i < temp->arglist.size(); i++) {
 					if(temp->arglist[i] != $3->vector_str[i]) {
-						err("custom", to_string(i+1)+"th argument mismatch in function "+temp->getName());
+						// log("debug", temp->arglist[i] + $3->vector_str[i]);
+						// *** the following check is done to for the sake of resemblance with sample io ***
+						SymbolInfo* temp2 = symbolTable->lookup(trim(split($3->name, ' ')[i]));
+						if(!(temp2 && temp2->isArray())) err("custom", to_string(i+1)+"th argument mismatch in function "+temp->getName());
+
+
+						// *** the following line is added to for the sake of resemblance with sample io ***
+						break;
 
 					}
 				}
@@ -1207,6 +1284,8 @@ argument_list: arguments {
 	
 arguments: arguments COMMA logic_expression {
 		log("production", "arguments : arguments COMMA logic_expression");
+
+		// log("debug", $3->name+" ==> "+$3->expr_val_type + "in arguments: arguments COMMA logic_expression");
 
 		$$->vector_str.push_back($3->expr_val_type);
 		$$->name += ", " + $3->name;
