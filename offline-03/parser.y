@@ -34,6 +34,8 @@ void yyerror(const char *s)
 {
 	log_stream<<"Error at line "<<line_count<<": "<<(string)s<<endl<<endl;
 	error_stream<<"Error at line "<<line_count<<": "<<(string)s<<endl<<endl;
+
+	error_count++;
 }
 
 vector<string> split(string str,   char delim) {
@@ -358,6 +360,20 @@ func_declaration: type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
 
 		log("matched", $$->name);
 	}
+	| type_specifier ID LPAREN parameter_list error RPAREN SEMICOLON {
+		$2->setAsFunction();
+		$2->datatype = $1->name;
+		$2->arglist = $4->vector_str;
+		if(!symbolTable->insert($2)) {
+			err("multi_dec", $2->getName());
+		}
+
+		log("production", "func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON");
+
+		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " );";
+
+		log("matched", $$->name);
+	}
 	| type_specifier ID LPAREN RPAREN SEMICOLON {
 		$2->setAsFunction();
 		$2->datatype = $1->name;
@@ -391,7 +407,6 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 						for(int i = 0; i < temp->arglist.size(); i++) {
 							if(temp->arglist[i] != $4->vector_str[i]) {
 								err("custom", to_string(i+1)+"th argument mismatch in function "+temp->getName());
-
 							}
 						}
 					} else {
@@ -417,6 +432,13 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 			$2->arglist = $4->vector_str;
 		
 			symbolTable->insert($2);
+		}
+
+		vector<string> exploded_params = split($4->name, ',');
+		for(int i = 0; i < exploded_params.size(); i++) {
+			if(split(exploded_params[i], ' ').size() == 1) {
+				err("custom", to_string(i+1)+"th parameter's name not given in function definition of "+$2->getName());
+			}
 		}
 
 	}
@@ -448,6 +470,91 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("matched", $$->name);
 	}
+
+	| type_specifier ID LPAREN parameter_list error RPAREN {
+		symbolTable->setPrebuiltScopeTable($4->scopeTable);
+		
+		SymbolInfo* temp;
+		if(temp = symbolTable->lookup($2->getName())) {
+			if(!temp->isFunction())
+				err("multi_dec", $2->getName());
+			else {
+				// is a function
+				if(temp->isFunctionDefined())
+					err("redef", $2->getName());
+				else {
+					// declared but undefined function
+					// check param validity
+					if(temp->arglist.size() == $4->vector_str.size()) {
+						for(int i = 0; i < temp->arglist.size(); i++) {
+							if(temp->arglist[i] != $4->vector_str[i]) {
+								err("custom", to_string(i+1)+"th argument mismatch in function "+temp->getName());
+							}		
+						}
+					} else {
+						err("total_arg_mismatch", temp->getName());
+					}
+
+					temp->setAsFunctionDefined();
+				}
+
+				// log("debug", temp->datatype);
+				// log("debug", $1->name);
+
+				if(temp->datatype != $1->name)
+					err("return_mismatch",temp->getName());
+			}
+
+		} else {
+			// not previously declared function
+
+			$2->setAsFunction();
+			$2->setAsFunctionDefined();
+			$2->datatype = $1->name;
+			$2->arglist = $4->vector_str;
+		
+			symbolTable->insert($2);
+		}
+
+		vector<string> exploded_params = split($4->name, ',');
+		for(int i = 0; i < exploded_params.size(); i++) {
+			if(split(exploded_params[i], ' ').size() == 1) {
+				err("custom", to_string(i+1)+"th parameter's name not given in function definition of "+$2->getName());
+			}
+		}
+
+	}
+	compound_statement {
+		// if(SymbolInfo* temp = symbolTable->lookup($2->getName())) {
+			// if(!temp->isFunction())
+			// 	err("multi_dec", $2->getName());
+			// else if(temp->isFunction()) {
+			// 	if(temp->isFunctionDefined())
+			// 		err("redef", $2->getName());
+
+			// 	if(temp->datatype != $1->name)
+			// 		err("return_mismatch",temp->getName());
+			// }
+			// temp->setAsFunctionDefined();
+
+		// } else {
+			// $2->setAsFunction();
+			// $2->setAsFunctionDefined();
+			// $2->arglist = $4->vector_str;
+		
+			// symbolTable->insert($2);
+		// }
+			
+
+		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
+
+		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " ) " + $8->name; // not $6 because https://www.gnu.org/software/bison/manual/bison.html#Midrule-Actions
+
+		log("matched", $$->name);
+
+		// yyerrok;
+	}
+
 	| type_specifier ID LPAREN RPAREN {
 		SymbolInfo* temp;
 		if(temp = symbolTable->lookup($2->getName())) {
@@ -526,12 +633,42 @@ parameter_list: parameter_list COMMA type_specifier ID {
 
 		log("matched", $$->name);
 	}
+	| parameter_list error COMMA type_specifier ID {
+		if($4->name == "void") {
+			err("var_void","");
+		}
+		$$ = $1;
+		$$->vector_str.push_back($4->name);
+			
+		$5->setDataType($4->name);
+		if(!$$->scopeTable->insert($5)) {
+			err("multi_dec_param", $5->getName());
+		}
+		$$->name += ", " +$4->name+" "+$5->getName();
+
+		log("production", "parameter_list : parameter_list COMMA type_specifier ID");
+
+		// $$->scopeTable->print(log_stream);
+
+		log("matched", $$->name);
+	}
 	| parameter_list COMMA type_specifier {
 		log("production", "parameter_list : parameter_list COMMA type_specifier");
 
 		$$ = $1;
 		$$->vector_str.push_back($3->name);
 		$$->name += ", " + $3->name;
+
+		// $$->scopeTable->print(log_stream);
+
+		log("matched", $$->name);
+	}
+	| parameter_list error COMMA type_specifier {
+		log("production", "parameter_list : parameter_list COMMA type_specifier");
+
+		$$ = $1;
+		$$->vector_str.push_back($4->name);
+		$$->name += ", " + $4->name;
 
 		// $$->scopeTable->print(log_stream);
 
@@ -646,6 +783,46 @@ var_declaration: type_specifier declaration_list SEMICOLON {
 
 		log("matched", $$->name);
 	}
+	| type_specifier declaration_list error SEMICOLON {
+		///
+		
+
+		log("production", "var_declaration : type_specifier declaration_list SEMICOLON");
+
+		if($1->name == "void") {
+			err("var_void", "");
+			// remove all the symbols in dec_list
+
+			for(auto i : $2 -> vector_si) {
+				if(!i->isError) { 
+					SymbolInfo* temp;
+					symbolTable->remove(i->getName());
+				
+
+					// log("debug", i->getName()+" "+i->datatype+" "+symbolTable->lookup(i->getName())->datatype+" <<<<<<<<<<<<<<<<<");
+
+				}
+			}
+		} else {
+
+
+			for(auto i : $2 -> vector_si) {
+				if(!i->isError) { 
+					// i->setDataType($1->name); line commented because of new instance of "c" in "int c[CONST_INT]; float c[CONST_INT];" creates a new SymbolInfo pointer, that may not be in the scopetable
+					SymbolInfo* temp;
+					if(temp = symbolTable->lookup(i->getName())) temp->setDataType($1->name);
+				
+
+					// log("debug", i->getName()+" "+i->datatype+" "+symbolTable->lookup(i->getName())->datatype+" <<<<<<<<<<<<<<<<<");
+
+				}
+			}
+		}
+
+		$$->name = $1-> name + " " + $2-> name + ";";
+
+		log("matched", $$->name);
+	}
  	;
  		 
 type_specifier: INT {
@@ -687,6 +864,19 @@ declaration_list: declaration_list COMMA ID {
 
 		log("matched", $$->name);
 	}
+	| declaration_list error COMMA ID {	
+		if($4->isError = !symbolTable->insert($4)) {
+			err("multi_dec", $4->getName());
+		}
+
+		log("production", "declaration_list : declaration_list COMMA ID");
+			
+		$$ = $1;
+		$$->name += ", " + $4->getName();
+		$$->vector_si.push_back($4);
+
+		log("matched", $$->name);
+	}
  	| declaration_list COMMA ID LTHIRD CONST_INT RTHIRD {
 			
 		if($3->isError = !symbolTable->insert($3)) {
@@ -694,6 +884,23 @@ declaration_list: declaration_list COMMA ID {
 		}
 
 		log("production", "declaration_list : declaration_list COMMA ID LTHIRD CONST_INT RTHIRD");
+
+		$$ = $1;
+		$$->name += ", " + $3->getName() + "[" + $5->getName() + "]";
+		$3-> setAsArray(atoi($5->getName().c_str()));
+		$$->vector_si.push_back($3);
+
+		log("matched", $$->name);
+	}
+	| declaration_list COMMA ID LTHIRD CONST_FLOAT RTHIRD {
+			
+		if($3->isError = !symbolTable->insert($3)) {
+			err("multi_dec", $3->getName());
+		}
+
+		// log("production", "declaration_list : declaration_list COMMA ID LTHIRD CONST_INT RTHIRD");
+
+		err("[non_int]",$3->getName());
 
 		$$ = $1;
 		$$->name += ", " + $3->getName() + "[" + $5->getName() + "]";
@@ -723,6 +930,22 @@ declaration_list: declaration_list COMMA ID {
 		}
 
 		log("production", "declaration_list : ID LTHIRD CONST_INT RTHIRD");
+
+		$$ = new NonTerminalInfo();
+		$$->name = $1->getName() + "[" + $3->getName() + "]";
+		$1-> setAsArray(atoi($3->getName().c_str()));
+		$$->vector_si.push_back($1);
+
+		log("matched", $$->name);
+	}
+	| ID LTHIRD CONST_FLOAT RTHIRD {
+			
+		if($1->isError = !symbolTable->insert($1)) {
+			err("multi_dec", $1->getName());
+		}
+
+		// log("production", "declaration_list : ID LTHIRD CONST_INT RTHIRD");
+		err("[non_int]",$1->getName());
 
 		$$ = new NonTerminalInfo();
 		$$->name = $1->getName() + "[" + $3->getName() + "]";
@@ -836,6 +1059,13 @@ expression_statement: SEMICOLON	{
 	}		
 	| expression SEMICOLON {
 		log("production", "expression_statement : expression SEMICOLON");
+
+
+		$$->name += ";";
+		log("matched", $$->name);
+	}
+	| expression error {
+		log("custom", "unterminated statement found");
 
 
 		$$->name += ";";
@@ -1072,6 +1302,32 @@ simple_expression: term {
 
 		$$->name += " " + $2->getName() + " " +$3->name;
 		log("matched", $$->name);
+	}
+
+	| simple_expression ADDOP error term{
+		log("production", "simple_expression : simple_expression ADDOP error term");
+
+		if($1->expr_val_type == "void_func" || $4->expr_val_type == "void_func") {
+			err("void_func", "");
+			$$->expr_val_type = "void_func_dealt";
+		}
+
+		yyerrok;
+
+		// if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
+		// 	$$->expr_int_val = calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$->expr_val_type);
+		// } else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
+		// 	$$->expr_float_val = calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$->expr_val_type);
+		// } else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
+		// 	$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$->expr_val_type);
+		// } else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
+		// 	$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$->expr_val_type);
+		// }
+
+		$$->name += " " + $2->getName() + " " +$4->name;
+		log("matched", $$->name);
+
+		
 	}
 	;
 					

@@ -27,6 +27,7 @@
     // ofstream token_stream(TOKEN_FILENAME);
 
     extern ofstream log_stream;
+    extern ofstream error_stream;
     extern ofstream token_stream;
 
     // extern YYSTYPE yylval;
@@ -681,7 +682,8 @@ ALPHANUM [a-zA-Z_0-9]
 
 
 . {
-    log_stream<<endl<<"Error at line no "<< line_count <<": Unrecognized character "<< yytext <<endl;
+    log_stream<<"Error at line "<< line_count <<": Unrecognized character "<< yytext <<endl<<endl;
+    error_stream<<"Error at line "<< line_count <<": Unrecognized character "<< yytext <<endl<<endl;
     error_count++;
 }
 
