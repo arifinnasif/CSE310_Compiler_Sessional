@@ -15,6 +15,7 @@ class NonTerminalInfo {
 
     public:
     bool isError;
+    bool isExpressionConst;
     string expr_val_type;
     int expr_int_val;
     double expr_float_val;

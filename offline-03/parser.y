@@ -7,6 +7,8 @@
 #include<vector>
 #include "lib/src/SymbolTable/1805097_SymbolTable.h"
 #include "lib/src/util/NonTerminalInfo.h"
+
+#define ADDITIONAL_SEM_ERR 1
 // #define YYSTYPE SymbolInfo*
 
 #define BUCKET_SIZE 32
@@ -86,6 +88,18 @@ void log(string type, string message) {
 		cout<<"========================"<<endl;
 		cout<<message<<endl;
 		cout<<"************************"<<endl;
+	}
+}
+
+void sem_err(string type, string message) {
+	if(ADDITIONAL_SEM_ERR) {
+		error_count++;
+		log_stream<<"Error at line "<<line_count<<": ";
+		error_stream<<"Error at line "<<line_count<<": ";
+		if(type == "custom") {
+			log_stream<<message<<endl<<endl;
+			error_stream<<message<<endl<<endl;
+		}
 	}
 }
 
@@ -174,96 +188,118 @@ void err(string type, string message) {
 	}
 }
 
-int calc(string op, int a, int b, string& result_type) {
-	result_type = "int";
+int calc(string op, int a, int b, NonTerminalInfo* result) {
+	result->expr_val_type = "int";
 	if(op == "+") {
-		return a+b;
+		return result->expr_int_val = a+b;
 	} else if(op == "-") {
-		return a-b;
+		return result->expr_int_val = a-b;
 	} else if(op == "*") {
-		return a*b;
+		return result->expr_int_val = a*b;
 	} else if(op == "/") {
 		if(b == 0) {
 			err("div_zero","");
-			result_type = "NaN";
-			return INT_MAX;
+			// result_type = "NaN";
+			result->isExpressionConst = false;
+			return result->expr_int_val = INT_MAX;
 		}
 		return a/b;
 	} else if(op == "%") {
 		if(b == 0) {
 			err("mod_zero","");
-			result_type = "NaN";
-			return INT_MAX;
+			// result_type = "NaN";
+			result->isExpressionConst = false;
+			return result->expr_int_val = INT_MAX;
 		}
-		return a%b;
+		return result->expr_int_val = a%b;
 	}
 }
 
-double calc(string op, int a, double b, string& result_type) {
-	result_type = "float";
+double calc(string op, int a, double b, NonTerminalInfo* result) {
+	result->expr_val_type = "float";
 	if(op == "+") {
-		return a+b;
+		return result->expr_float_val = a+b;
 	} else if(op == "-") {
-		return a-b;
+		return result->expr_float_val = a-b;
 	} else if(op == "*") {
-		return a*b;
+		return result->expr_float_val = a*b;
 	} else if(op == "/") {
 		if(b == 0) {
 			err("div_zero","");
-			result_type = "NaN";
-			return INT_MAX;
+			// result_type = "NaN";
+			result->isExpressionConst = false;
+			return result->expr_float_val = INT_MAX;
 		}
 		return a/b;
 	} else if(op == "%") {
+		if(b == 0) err("mod_zero","");
 		err("non_int_mod","");
-		result_type = "NaN";
-		return INT_MAX;
+		// result_type = "NaN";
+		result->isExpressionConst = false;
+		result->expr_val_type = "int";
+		return result->expr_int_val = INT_MAX;
 	}
 }
 
-double calc(string op, double a, double b, string& result_type) {
-	result_type = "float";
+double calc(string op, double a, double b, NonTerminalInfo* result) {
+	result->expr_val_type = "float";
 	if(op == "+") {
-		return a+b;
+		return result->expr_float_val = a+b;
 	} else if(op == "-") {
-		return a-b;
+		return result->expr_float_val = a-b;
 	} else if(op == "*") {
-		return a*b;
+		return result->expr_float_val = a*b;
 	} else if(op == "/") {
 		if(b == 0) {
 			err("div_zero","");
-			result_type = "NaN";
-			return INT_MAX;
+			// result_type = "NaN";
+			result->isExpressionConst = false;
+			return result->expr_float_val = INT_MAX;
 		}
 		return a/b;
 	} else if(op == "%") {
+		if(b == 0) err("mod_zero","");
 		err("non_int_mod","");
-		result_type = "NaN";
-		return INT_MAX;
+		// result_type = "NaN";
+		result->isExpressionConst = false;
+		result->expr_val_type = "int";
+		return result->expr_int_val = INT_MAX;
 	}
 }
 
-double calc(string op, double a, int b, string& result_type) {
-	result_type = "float";
+double calc(string op, double a, int b, NonTerminalInfo* result) {
+	result->expr_val_type = "float";
 	if(op == "+") {
-		return a+b;
+		return result->expr_float_val = a+b;
 	} else if(op == "-") {
-		return a-b;
+		return result->expr_float_val = a-b;
 	} else if(op == "*") {
-		return a*b;
+		return result->expr_float_val = a*b;
 	} else if(op == "/") {
 		if(b == 0) {
 			err("div_zero","");
-			result_type = "NaN";
-			return INT_MAX;
+			// result_type = "NaN";
+			result->isExpressionConst = false;
+			return result->expr_float_val = INT_MAX;
 		}
 		return a/b;
 	} else if(op == "%") {
+		if(b == 0) err("mod_zero","");
 		err("non_int_mod","");
-		result_type = "NaN";
-		return INT_MAX;
+		// result_type = "NaN";
+		result->isExpressionConst = false;
+		result->expr_val_type = "int";
+		return result->expr_int_val = INT_MAX;
 	}
 }
+
+// void safe_delete(NonTerminalInfo * arg) {
+// 	if(arg) delete arg;
+// }
+
+// void safe_delete(SymbolInfo * arg) {
+// 	if(arg) delete arg;
+// }
 
 %}
 
@@ -300,12 +336,21 @@ double calc(string op, double a, int b, string& result_type) {
 %nonassoc LESS_PREC_THAN_ELSE
 %nonassoc ELSE
 
+// %destructor {
+// 	if($$) delete $$;
+// } <nonTerminalInfo>
+
+// %destructor {
+// 	if($$) delete $$;
+// } <symbolInfo>
+
 
 %%
 
 start: program {
 		//write your code in this block in all the similar blocks below
 		log("production", "start : program");
+
 
 		
 		// log("matched", $$->name);
@@ -317,6 +362,8 @@ program: program unit {
 
 		$$->name = $1->name + "\n" + $2->name;
 		log("matched", $$->name);
+
+		// safe_delete($2);
 	}
 	| unit {
 		log("production", "program : unit");
@@ -466,7 +513,21 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
 
+		
+		
+		// extra semantic error
+		if($1->name == "void") {
+			if($7->vector_str.size()) sem_err("custom", "void function returning a non-void");
+		} else {
+			if(!$7->vector_str.size()) sem_err("custom", "non-void function is not returning anything");
+			for(auto i : $7->vector_str) {
+				if(i == "int" && $1->name == "float") continue;
+				if(i != $1->name) sem_err("custom", "returned datatype does not match");
+			}
+		}
+
 		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " ) " + $7->name; // not $6 because https://www.gnu.org/software/bison/manual/bison.html#Midrule-Actions
+		
 
 		log("matched", $$->name);
 	}
@@ -548,6 +609,17 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
 
+		// extra semantic error
+		if($1->name == "void") {
+			if($8->vector_str.size()) sem_err("custom", "void function returning a non-void");
+		} else {
+			if(!$8->vector_str.size()) sem_err("custom", "non-void function is not returning anything");
+			for(auto i : $8->vector_str) {
+				if(i == "int" && $1->name == "float") continue;
+				if(i != $1->name) sem_err("custom", "returned datatype does not match");
+			}
+		}
+
 		$$->name = $1->name+" "+$2->getName()+" ( " + $4->name + " ) " + $8->name; // not $6 because https://www.gnu.org/software/bison/manual/bison.html#Midrule-Actions
 
 		log("matched", $$->name);
@@ -606,6 +678,17 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 		
 
 		log("production", "func_definition : type_specifier ID LPAREN RPAREN compound_statement");
+
+		// extra semantic error
+		if($1->name == "void") {
+			if($6->vector_str.size()) sem_err("custom", "void function returning a non-void");
+		} else {
+			if(!$6->vector_str.size()) sem_err("custom", "non-void function is not returning anything");
+			for(auto i : $6->vector_str) {
+				if(i == "int" && $1->name == "float") continue;
+				if(i != $1->name) sem_err("custom", "returned datatype does not match");
+			}
+		}
 
 		$$->name = $1->name+" "+$2->getName()+" ( ) " + $6->name;
 
@@ -965,6 +1048,7 @@ statements: statement {
 		log("production", "statements : statements statement");
 
 		$$->name += "\n"+$2->name;
+		for(auto i : $2->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 	}
@@ -990,6 +1074,7 @@ statement: var_declaration {
 
 		$$ = new NonTerminalInfo();
 		$$->name = "for ( " + $3->name + $4->name + $5->name + " ) " + $7->name;
+		for(auto i : $7->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 	}
@@ -998,6 +1083,7 @@ statement: var_declaration {
 
 		$$ = new NonTerminalInfo();
 		$$->name = "if ( " + $3->name + " ) \n" + $5->name;
+		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 	}
@@ -1006,6 +1092,8 @@ statement: var_declaration {
 
 		$$ = new NonTerminalInfo();
 		$$->name = "if ( " + $3->name + " ) \n" + $5->name + "\nelse\n" + $7->name;
+		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
+		for(auto i : $7->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 	}
@@ -1014,6 +1102,7 @@ statement: var_declaration {
 
 		$$ = new NonTerminalInfo();
 		$$->name = "while ( " + $3->name + " ) \n" + $5->name;
+		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 	}
@@ -1044,6 +1133,7 @@ statement: var_declaration {
 
 		$$ = new NonTerminalInfo();
 		$$->name = "return " + $2->name + ";";
+		$$->vector_str.push_back($2->expr_val_type);
 
 		log("matched", $$->name);
 	}
@@ -1083,6 +1173,7 @@ variable: ID {
 			// $$->isError = true;
 
 			temp = $1;
+			temp->datatype = "undec";
 
 		} else if(temp->isArray()) {
 			err("tm_arr", $1->getName());
@@ -1099,11 +1190,6 @@ variable: ID {
 		
 		// log("debug")
 		$$->expr_val_type = temp->datatype;
-		if($$->expr_val_type == "int") {
-			$$->expr_int_val = temp->int_val;
-		} else if ($$->expr_val_type == "float") {
-			$$->expr_float_val = temp->float_val;
-		}
 
 		log("matched", $$->name);
 	}
@@ -1117,6 +1203,7 @@ variable: ID {
 			$$->isError = true;
 
 			temp = $1;
+			temp->datatype = "undec";
 
 		} else if(!temp->isArray()) {
 			err("not_arr", $1->getName());
@@ -1145,48 +1232,67 @@ expression: logic_expression {
 
 		if($3->expr_val_type == "void_func") {
 			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
+			$$->expr_val_type = "void";
 		}
-
+		/*
 		SymbolInfo* temp;
 		if((temp = symbolTable->lookup($1->name)) != NULL) {
 			if(temp->datatype == "int") {
 				if($3->expr_val_type == "int") {
-					$1->expr_int_val = temp->int_val = $3->expr_int_val;
+					// $1->expr_int_val = temp->int_val = $3->expr_int_val;
 					
 				} else if($3->expr_val_type == "float") {
-					$1->expr_int_val = temp->int_val = $3->expr_float_val;
+					// $1->expr_int_val = temp->int_val = $3->expr_float_val;
 					err("int_float", "");
 				}
 			} else if(temp->datatype == "float") {
 				if($3->expr_val_type == "int") {
-					$1->expr_float_val = temp->float_val = $3->expr_int_val;
+					// $1->expr_float_val = temp->float_val = $3->expr_int_val;
 					// err("float_int", "");
 
 				} else if($3->expr_val_type == "float") {
-					$1->expr_float_val = temp->float_val = $3->expr_float_val;
+					// $1->expr_float_val = temp->float_val = $3->expr_float_val;
 					
 				}
 			}
 		} else {
 			if($1->expr_val_type == "int") {
 				if($3->expr_val_type == "int") {
-					$1->expr_int_val = $3->expr_int_val;
+					// $1->expr_int_val = $3->expr_int_val;
 					
 				} else if($3->expr_val_type == "float") {
-					$1->expr_int_val = $3->expr_float_val;
+					// $1->expr_int_val = $3->expr_float_val;
 					err("int_float", "");
 				}
 			} else if($1->expr_val_type == "float") {
 				if($3->expr_val_type == "int") {
-					$1->expr_float_val = $3->expr_int_val;
+					// $1->expr_float_val = $3->expr_int_val;
 					// err("float_int", "");
 
 				} else if($3->expr_val_type == "float") {
-					$1->expr_float_val = $3->expr_float_val;
+					// $1->expr_float_val = $3->expr_float_val;
 					
 				}
 			}
+		}*/
+
+		/*
+		SymbolInfo* temp;
+		if((temp = symbolTable->lookup($1->name)) != NULL) {
+			if(temp->datatype == "int" && $3->expr_val_type == "float") {
+				err("int_float", "");
+				
+			} else if(temp->datatype == "float" && $3->expr_val_type == "int") {
+				// err("float_int", "");
+			}
+		}
+		*/
+
+		if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
+			err("int_float", "");
+				
+		} else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
+			// err("float_int", "");
 		}
 
 
@@ -1207,22 +1313,31 @@ logic_expression: rel_expression {
 
 		$$->expr_val_type = "int";
 
-		double val1, val2;
+		if($1->isExpressionConst && $3-> isExpressionConst) {
 
-		if($1->expr_val_type == "float") val1 = $1->expr_float_val;
-		else if($1->expr_val_type == "int") val1 = $1->expr_int_val;
+			double val1, val2;
 
-		if($3->expr_val_type == "float") val2 = $3->expr_float_val;
-		else if($3->expr_val_type == "int") val2 = $3->expr_int_val;
+			if($1->expr_val_type == "float") val1 = $1->expr_float_val;
+			else if($1->expr_val_type == "int") val1 = $1->expr_int_val;
 
-		if($2->getName() == "||") {
-			$$->expr_int_val = (val1 || val2);
-		} else if($2->getName() == "&&") {
-			$$->expr_int_val = (val1 && val2);
+			if($3->expr_val_type == "float") val2 = $3->expr_float_val;
+			else if($3->expr_val_type == "int") val2 = $3->expr_int_val;
+
+			if($2->getName() == "||") {
+				$$->expr_int_val = (val1 || val2);
+			} else if($2->getName() == "&&") {
+				$$->expr_int_val = (val1 && val2);
+			}
+
+		} else {
+			$$->isExpressionConst = false;
+			if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
+				err("void_func", "");
+				$$->expr_val_type = "void";
+			} else if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
 		}
 
-		if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
-		if($1->expr_val_type == "NaN" || $3->expr_val_type == "NaN") $$->expr_val_type = "NaN";
+		// if($1->expr_val_type == "NaN" || $3->expr_val_type == "NaN") $$->expr_val_type = "NaN";
 
 
 		$$->name += " " + $2->getName() + " " +$3->name;
@@ -1242,33 +1357,38 @@ rel_expression: simple_expression {
 
 		$$->expr_val_type = "int";
 
-		if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
-			err("void_func", "");
-			//$$->expr_val_type = "void_func_dealt";
+		
+
+		if($1->isExpressionConst && $3->isExpressionConst) {
+			double val1, val2;
+
+			if($1->expr_val_type == "float") val1 = $1->expr_float_val;
+			else if($1->expr_val_type == "int") val1 = $1->expr_int_val;
+
+			if($3->expr_val_type == "float") val2 = $3->expr_float_val;
+			else if($3->expr_val_type == "int") val2 = $3->expr_int_val;
+
+			if($2->getName() == "==") {
+				$$->expr_int_val = (val1 == val2);
+			} else if($2->getName() == "<=") {
+				$$->expr_int_val = (val1 <= val2);
+			} else if($2->getName() == ">=") {
+				$$->expr_int_val = (val1 >= val2);
+			} else if($2->getName() == "<") {
+				$$->expr_int_val = (val1 < val2);
+			} else if($2->getName() == ">") {
+				$$->expr_int_val = (val1 > val2);
+			}
+		} else {
+			$$->isExpressionConst = false;
+			if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
+				err("void_func", "");
+				$$->expr_val_type = "void";
+			} else if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
 		}
 
-		double val1, val2;
-
-		if($1->expr_val_type == "float") val1 = $1->expr_float_val;
-		else if($1->expr_val_type == "int") val1 = $1->expr_int_val;
-
-		if($3->expr_val_type == "float") val2 = $3->expr_float_val;
-		else if($3->expr_val_type == "int") val2 = $3->expr_int_val;
-
-		if($2->getName() == "==") {
-			$$->expr_int_val = (val1 == val2);
-		} else if($2->getName() == "<=") {
-			$$->expr_int_val = (val1 <= val2);
-		} else if($2->getName() == ">=") {
-			$$->expr_int_val = (val1 >= val2);
-		} else if($2->getName() == "<") {
-			$$->expr_int_val = (val1 < val2);
-		} else if($2->getName() == ">") {
-			$$->expr_int_val = (val1 > val2);
-		}
-
-		if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
-		if($1->expr_val_type == "NaN" || $3->expr_val_type == "NaN") $$->expr_val_type = "NaN";
+		
+		// if($1->expr_val_type == "NaN" || $3->expr_val_type == "NaN") $$->expr_val_type = "NaN";
 
 		$$->name += " " + $2->getName() + " " +$3->name;
 		log("matched", $$->name);
@@ -1285,19 +1405,25 @@ simple_expression: term {
 	| simple_expression ADDOP term {
 		log("production", "simple_expression : simple_expression ADDOP term");
 
-		if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
-			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
-		}
-
-		if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
-			$$->expr_int_val = calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$->expr_val_type);
+		if($1->isExpressionConst && $3->isExpressionConst) {
+			if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
+				calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$);
+			} else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
+				calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$);
+			} else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
+				calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$);
+			} else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
+				calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$);
+			}
+		} else {
+			$$->isExpressionConst = false;
+			if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
+				err("void_func", "");
+				$$->expr_val_type = "void";
+			}
+			else if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
+			else if($1->expr_val_type == "float" || $3->expr_val_type == "float") $$->expr_val_type = "float";
+			else $$->expr_val_type = "int";
 		}
 
 		$$->name += " " + $2->getName() + " " +$3->name;
@@ -1309,8 +1435,9 @@ simple_expression: term {
 
 		if($1->expr_val_type == "void_func" || $4->expr_val_type == "void_func") {
 			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
+			$$->expr_val_type = "void";
 		}
+		$$->isExpressionConst = false;
 
 		yyerrok;
 
@@ -1341,19 +1468,50 @@ term: unary_expression {
     | term MULOP unary_expression {
 		log("production", "term : term MULOP unary_expression");
 
-		if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
-			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
-		}
+		
 
-		if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
-			$$->expr_int_val = calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$->expr_val_type);
-		} else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
-			$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$->expr_val_type);
+		if($1->isExpressionConst && $3->isExpressionConst) {
+			if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
+				calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$);
+			} else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
+				calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$);
+			} else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
+				calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$);
+			} else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
+				calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$);
+			}
+		} else {
+			$$->isExpressionConst = false;
+			
+
+			if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
+				err("void_func", "");
+				$$->expr_val_type = "void";
+			}
+			else if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
+			else if($1->expr_val_type == "float" || $3->expr_val_type == "float") $$->expr_val_type = "float";
+			else $$->expr_val_type = "int";
+
+			if($2->getName() == "/" && $3->isExpressionConst) {
+				//handles <non_const> / 0
+				if($3->isExpressionConst)
+					if(($3->expr_val_type == "int" && $3->expr_int_val == 0) || ($3->expr_val_type == "float" && $3->expr_float_val == 0))
+						err("div_zero","");
+
+			} else if($2->getName() == "%") {
+				//handles <non_const> % 0
+				if($3->isExpressionConst)
+					if(($3->expr_val_type == "int" && $3->expr_int_val == 0) || ($3->expr_val_type == "float" && $3->expr_float_val == 0))
+						err("mod_zero","");
+
+				//handles <non_int> % <non_int>
+				if($1->expr_val_type == "float" ||  $3->expr_val_type == "float") {
+					err("non_int_mod","");
+				}
+
+				$$->expr_val_type = "int";
+			}
+
 		}
 		
 
@@ -1370,10 +1528,10 @@ unary_expression: ADDOP unary_expression {
 
 		if($2->expr_val_type == "void_func") {
 			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
+			$$->expr_val_type = "void";
 		}
 
-		if($1->getName() == "-") {
+		if($2->isExpressionConst && $1->getName() == "-") {
 			if($2->expr_val_type == "int") {
 				$$-> expr_int_val = - ($2->expr_int_val);
 
@@ -1393,16 +1551,16 @@ unary_expression: ADDOP unary_expression {
 
 		if($2->expr_val_type == "void_func") {
 			err("void_func", "");
-			$$->expr_val_type = "void_func_dealt";
+			$$->expr_val_type = "void";
 		}
 
 		if($2->expr_val_type == "int") {
 			$$-> expr_val_type = "int";
-			$$-> expr_int_val = ! ($2->expr_int_val);
+			if($2->isExpressionConst) $$-> expr_int_val = ! ($2->expr_int_val);
 
 		} else if($2->expr_val_type == "float") {
 			$$-> expr_val_type = "int";
-			$$-> expr_int_val = ! ($2->expr_float_val);
+			if($2->isExpressionConst) $$-> expr_int_val = ! ($2->expr_float_val);
 
 		} else if($2->expr_val_type == "void") {
 			$$-> expr_val_type = "void";
@@ -1464,13 +1622,10 @@ factor: variable {
 		}
 
 		
-
-		
-
-		
 		$$->setName($1->getName() + " ( " + $3->name + " )");
 
 		log("matched", $$->name);
+		// safe_delete($3);
 	}
 	| LPAREN expression RPAREN {
 		log("production", "factor : LPAREN expression RPAREN");
@@ -1486,6 +1641,7 @@ factor: variable {
 		$$->name = $1->getName();
 		$$->expr_val_type = "int";
 		$$->expr_int_val = atoi($1->getName().c_str());
+		$$->isExpressionConst = true;
 		log("matched", $$->name);
 	}
 	| CONST_FLOAT  {
@@ -1494,7 +1650,8 @@ factor: variable {
 		$$ = new NonTerminalInfo();
 		$$->name = $1->getName();
 		$$->expr_val_type = "float";
-		$$->expr_int_val = atof($1->getName().c_str());
+		$$->expr_float_val = atof($1->getName().c_str());
+		$$->isExpressionConst = true;
 		log("matched", $$->name);
 	}
 	| variable INCOP {
@@ -1502,11 +1659,11 @@ factor: variable {
 
 		$$->name += " ++";
 		// postfix
-		SymbolInfo * temp = symbolTable->lookup($1->name);
-		if(temp) {
-			temp->float_val++;
-			temp->int_val++;
-		}
+		// SymbolInfo * temp = symbolTable->lookup($1->name);
+		// if(temp) {
+		// 	temp->float_val++;
+		// 	temp->int_val++;
+		// }
 		log("matched", $$->name);
 	}
 	| variable DECOP {
@@ -1514,17 +1671,19 @@ factor: variable {
 
 		$$->name += " --";
 		// postfix
-		SymbolInfo * temp = symbolTable->lookup($1->name);
-		if(temp) {
-			temp->float_val--;
-			temp->int_val--;
-		}
+		// SymbolInfo * temp = symbolTable->lookup($1->name);
+		// if(temp) {
+		// 	temp->float_val--;
+		// 	temp->int_val--;
+		// }
 		log("matched", $$->name);
 	}
 	;
 	
 argument_list: arguments {
 		log("production", "argument_list : arguments");
+
+		$$ = $1;
 
 		log("matched", $$->name);
 	}
@@ -1542,11 +1701,13 @@ arguments: arguments COMMA logic_expression {
 		log("production", "arguments : arguments COMMA logic_expression");
 
 		// log("debug", $3->name+" ==> "+$3->expr_val_type + "in arguments: arguments COMMA logic_expression");
+		$$ = $1;
 
 		$$->vector_str.push_back($3->expr_val_type);
 		$$->name += ", " + $3->name;
 
 		log("matched", $$->name);
+		// safe_delete($3);
 	}
 	| logic_expression {
 		log("production", "arguments : logic_expression");
@@ -1556,6 +1717,8 @@ arguments: arguments COMMA logic_expression {
 		$$->vector_str.push_back($1->expr_val_type);
 
 		log("matched", $$->name);
+
+		// safe_delete($1);
 	}
 	;
  

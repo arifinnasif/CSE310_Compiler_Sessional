@@ -2,11 +2,14 @@
 
 
 NonTerminalInfo::NonTerminalInfo() {
-    
+    isError = false;
+    isExpressionConst = false;
 }
 
 NonTerminalInfo::NonTerminalInfo(string arg) {
     setName(arg);
+    isError = false;
+    isExpressionConst = false;
 }
 
 void NonTerminalInfo::setName(string arg) {
