@@ -5,6 +5,7 @@
 #include<cstring>
 #include<cmath>
 #include<vector>
+#include<regex>
 #include "lib/src/SymbolTable/1805097_SymbolTable.h"
 #include "lib/src/util/NonTerminalInfo.h"
 
@@ -304,6 +305,7 @@ string get_new_label() {
 }
 
 int frame_size = 0;
+int new_frame_size_for_arg = 0;
 
 vector< pair< string, int > > global_vars;
 
@@ -338,6 +340,14 @@ string get_mem_location(NonTerminalInfo * arg) {
 		}
 	}
 }
+
+string func_def_name;
+string func_dec_name;
+
+vector< pair<string,int> > _vector_replacement;
+
+int dummy =0;
+
 
 %}
 
@@ -394,6 +404,17 @@ start: program {
 			code_stream<<".STACK 100H "<<endl;
 
 			code_stream<<".DATA"<<endl;
+			code_stream<<"0OUTPUT_ARG             DW ?\n\
+			0OUTPUT_PROC_OUTSTRING	DB \"000000$\" \n\
+			0OUTPUT_PROC_IS_NEG		DB 0  \n\
+			\n\
+			CR						EQU 0DH\n\
+			LF						EQU 0AH\n\
+			\n\
+			NL						DB CR,LF,'$'\n"<<endl;
+
+			code_stream<<"; global var section" <<endl;
+
 			// global data goes here
 			for(auto g : global_vars) {
 				if(g.second == -1) {
@@ -407,6 +428,58 @@ start: program {
 
 			code_stream<<".CODE"<<endl;
 			// code goes here
+			code_stream<<"OUTPUT PROC\n\
+			    LEA SI, 0OUTPUT_PROC_OUTSTRING\n\
+			    ADD SI, 6\n\
+			    MOV AX, 0OUTPUT_ARG\n\
+			    \n\
+			    CMP AX, 0     \n\
+			    JL IS_NEG\n\
+			    MOV 0OUTPUT_PROC_IS_NEG, 0\n\
+			    \n\
+			    JMP END_IS_NEG\n\
+			    IS_NEG:  \n\
+			    MOV 0OUTPUT_PROC_IS_NEG, 1\n\
+			    NEG AX\n\
+			    \n\
+			    END_IS_NEG:\n\
+			    \n\
+			    PRINT_LOOP:\n\
+			        DEC SI\n\
+			        \n\
+			        MOV DX, 0\n\
+			        ; DX:AX = 0000:AX\n\
+			        \n\
+			        MOV CX, 10\n\
+			        DIV CX\n\
+			        \n\
+			        ADD DL, '0'\n\
+			        MOV [SI], DL\n\
+			        \n\
+			        CMP AX, 0\n\
+			        JNE PRINT_LOOP\n\
+			    \n\
+			    \n\
+			    CMP 0OUTPUT_PROC_IS_NEG, 0\n\
+			    JE END_ADD_MINUS\n\
+			    \n\
+			    ;ADD MINUS\n\
+			    DEC SI\n\
+			    MOV [SI], '-'\n\
+			    \n\
+			    END_ADD_MINUS:\n\
+			    MOV DX, SI\n\
+			    MOV AH, 9\n\
+			    INT 21H \n\
+			    \n\
+			    LEA DX, NL\n\
+			    MOV AH, 09H\n\
+			    INT 21H\n\
+			    \n\
+			    RET\n\
+			\n\
+			OUTPUT ENDP\n"<<endl;
+
 			code_stream<<$1->code<<endl;
 
 			code_stream<<"END MAIN"<<endl;
@@ -448,12 +521,16 @@ unit: var_declaration {
 
 	
 		log("matched", $$->name);
+
+		frame_size = 0;
 	}
     | func_declaration {
 		log("production", "unit : func_declaration");
 
 	
 		log("matched", $$->name);
+
+		frame_size = 0;
 	}
     | func_definition {
 		log("production", "unit : func_definition");
@@ -562,6 +639,8 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 			}
 		}
 
+		func_def_name=$2->getName();
+
 	}
 	compound_statement {
 		// if(SymbolInfo* temp = symbolTable->lookup($2->getName())) {
@@ -618,7 +697,14 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 		$$->code += "MOV BP, SP\n";
 		$$->code += "SUB SP, "+ to_string(frame_size) +"\n";
 
+		for(int i=0;i<_vector_replacement.size();i++) {
+			$7->code = regex_replace($7->code, regex(_vector_replacement[i].first), get_temp_stack_slot(frame_size+_vector_replacement[i].second));
+		}
+		_vector_replacement.clear();
+
 		$$->code += $7->code;
+
+		$$->code += "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
 
 		$$->code += "ADD SP, "+ to_string(frame_size) +"\n";
 		$$->code += "POP BP\n";
@@ -632,7 +718,7 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 			$$->code += "RET\n";
 		}
 
-		$$->code += $2->getName()+" ENDP\n";
+		$$->code += $2->getName()+" ENDP\n\n\n\n";
 	}
 
 	| type_specifier ID LPAREN parameter_list error RPAREN {
@@ -810,7 +896,16 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 		$$->code += "MOV BP, SP\n";
 		$$->code += "SUB SP, "+ to_string(frame_size) +"\n";
 
+		for(int i=0;i<_vector_replacement.size();i++) {
+			$6->code = regex_replace($6->code, regex(_vector_replacement[i].first), get_temp_stack_slot(frame_size+_vector_replacement[i].second));
+		}
+		_vector_replacement.clear();
+
 		$$->code += $6->code;
+
+		
+
+		$$->code += "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
 
 		$$->code += "ADD SP, "+ to_string(frame_size) +"\n";
 		$$->code += "POP BP\n";
@@ -847,6 +942,10 @@ parameter_list: parameter_list COMMA type_specifier ID {
 		// $$->scopeTable->print(log_stream);
 
 		log("matched", $$->name);
+
+		// code
+		frame_size+=2;
+		$4->frame_offset = frame_size;
 	}
 	| parameter_list error COMMA type_specifier ID {
 		if($4->name == "void") {
@@ -877,6 +976,10 @@ parameter_list: parameter_list COMMA type_specifier ID {
 		// $$->scopeTable->print(log_stream);
 
 		log("matched", $$->name);
+
+		// code
+		frame_size+=2;
+		// $4->frame_offset = frame_size;
 	}
 	| parameter_list error COMMA type_specifier {
 		log("production", "parameter_list : parameter_list COMMA type_specifier");
@@ -910,6 +1013,10 @@ parameter_list: parameter_list COMMA type_specifier ID {
 		// $$->scopeTable->print(log_stream);
 
 		log("matched", $$->name);
+
+		// code
+		frame_size+=2;
+		$2->frame_offset = frame_size;
 	}
 	| type_specifier {
 		log("production", "parameter_list : type_specifier");
@@ -921,6 +1028,10 @@ parameter_list: parameter_list COMMA type_specifier ID {
 		// $$->scopeTable->print(log_stream);
 
 		log("matched", $$->name);
+
+		// code
+		frame_size+=2;
+		// $1->frame_offset = frame_size;
 	}
  	;
 
@@ -1385,6 +1496,16 @@ statement: var_declaration {
 		$$->name = "printf ( " + $3->getName() + " ) ;";
 
 		log("matched", $$->name);
+
+		// code
+		if(temp->table_id == "1") {
+			$$->code = "MOV CX, "+temp->getName()+"\n";
+		} else {
+			$$->code = "MOV CX, "+get_temp_stack_slot(temp->frame_offset)+"\n";
+		}
+		
+		$$->code +="MOV 0OUTPUT_ARG, CX\n";
+		$$->code += "CALL OUTPUT\n";
 	}
 	| RETURN expression SEMICOLON {
 		log("production", "statement : RETURN expression SEMICOLON");
@@ -1394,6 +1515,11 @@ statement: var_declaration {
 		$$->vector_str.push_back($2->expr_val_type);
 
 		log("matched", $$->name);
+
+		// code
+		$$->code = $2->code;
+		$$->code += "MOV AX, "+get_mem_location($2)+"\n";
+		$$->code += "JMP FUNC_"+func_def_name+"_RETURN_LABEL\n";
 	}
 	;
 	  
@@ -1597,19 +1723,21 @@ expression: logic_expression {
 		// code
 		string temp_code = $1->code;
 		$$->code = $3->code;
-		if($3->is_global) {
-			if($3->is_array) {
-				$$->code += "MOV CX, " + trim(split($3->name, '[')[0]) + "[BX]\n";
-			} else {
-				$$->code += "MOV CX, " + $3->name +"\n";
-			}
-		} else {
-			if($3->is_array) {
-				$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset, "SI") + "\n";
-			} else {
-				$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset) +"\n";
-			}
-		}
+		// if($3->is_global) {
+		// 	if($3->is_array) {
+		// 		$$->code += "MOV CX, " + trim(split($3->name, '[')[0]) + "[BX]\n";
+		// 	} else {
+		// 		$$->code += "MOV CX, " + $3->name +"\n";
+		// 	}
+		// } else {
+		// 	if($3->is_array) {
+		// 		$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset, "SI") + "\n";
+		// 	} else {
+		// 		$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset) +"\n";
+		// 	}
+		// }
+
+		$$->code += "MOV CX, " + get_mem_location($3) + "\n";
 
 		
 
@@ -1617,19 +1745,21 @@ expression: logic_expression {
 
 		
 
-		if($1->is_global) {
-			if($1->is_array) {
-				$$->code += "MOV " + trim(split($1->name, '[')[0]) + "[BX], CX\n";
-			} else {
-				$$->code += "MOV " + $1->name +", CX\n";
-			}
-		} else {
-			if($1->is_array) {
-				$$->code += "MOV " + get_temp_stack_slot($1->frame_offset, "SI") + ", CX\n";
-			} else {
-				$$->code += "MOV " + get_temp_stack_slot($1->frame_offset) +", CX\n";
-			}
-		}
+		// if($1->is_global) {
+		// 	if($1->is_array) {
+		// 		$$->code += "MOV " + trim(split($1->name, '[')[0]) + "[BX], CX\n";
+		// 	} else {
+		// 		$$->code += "MOV " + $1->name +", CX\n";
+		// 	}
+		// } else {
+		// 	if($1->is_array) {
+		// 		$$->code += "MOV " + get_temp_stack_slot($1->frame_offset, "SI") + ", CX\n";
+		// 	} else {
+		// 		$$->code += "MOV " + get_temp_stack_slot($1->frame_offset) +", CX\n";
+		// 	}
+		// }
+
+		$$->code += "MOV " + get_mem_location($1) + ", CX\n";
 	}
 	;
 			
@@ -1967,6 +2097,7 @@ term: unary_expression {
 		$$->code = t1;
 		$$->code += t2;
 		$$->code += "MOV AX, "+get_mem_location($1)+"\n";
+		$$->code += "MOV DX, 0\n";
 		if($2->getName() == "*") {
 			$$->code += "IMUL "+get_mem_location($3)+"\n";
 		} else {
@@ -2129,6 +2260,28 @@ factor: variable {
 
 		log("matched", $$->name);
 		// safe_delete($3);
+
+		// code
+		if(!error_count) {
+			$$->code = $3->code;
+			for(int i = 0; i < $3->vector_NTmem_location.size(); i++) {
+				$$->code += "MOV CX, "+$3->vector_NTmem_location[i]+"\n";
+				// $$->code += "; framesize "+to_string(frame_size)+"\n";
+				// $$->code += "; i "+to_string(i)+"\n";
+				// $$->code += "MOV "+get_temp_stack_slot(frame_size
+				// 										
+				// 										+2/*for new func ret addr*/
+				// 										+2/*for old func BP*/
+				// 										+2*(i+1)/*actual offset wrt new BP*/)+", CX\n";
+				dummy++;
+				$$->code += "MOV #####REPLACE_AFTER_TOTAL_FRAME_"+to_string(dummy)+"#####, CX\n";
+				_vector_replacement.push_back(make_pair("#####REPLACE_AFTER_TOTAL_FRAME_"+to_string(dummy)+"#####",2+2+2*(i+1)));
+			}
+			$$->code += "CALL "+$1->getName()+"\n";
+			frame_size+=2;
+			$$->frame_offset = frame_size;
+			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", AX\n";
+		}
 	}
 	| LPAREN expression RPAREN {
 		log("production", "factor : LPAREN expression RPAREN");
@@ -2281,6 +2434,10 @@ argument_list: arguments {
 		$$ = $1;
 
 		log("matched", $$->name);
+
+		// code
+		$$->code = $1->code;
+
 	}
 	| {
 		log("production", "argument_list : ");
@@ -2303,6 +2460,13 @@ arguments: arguments COMMA logic_expression {
 
 		log("matched", $$->name);
 		// safe_delete($3);
+
+		// code
+		$$->code += $3->code;
+		// new_frame_size_for_arg += 2;
+		// $$->vector_int.push_back(new_frame_size_for_arg);
+		$$->vector_NTinfo.push_back($3);
+		$$->vector_NTmem_location.push_back(get_mem_location($3));
 	}
 	| logic_expression {
 		log("production", "arguments : logic_expression");
@@ -2314,6 +2478,13 @@ arguments: arguments COMMA logic_expression {
 		log("matched", $$->name);
 
 		// safe_delete($1);
+
+		// code
+		$$->code = $1->code;
+		// new_frame_size_for_arg += 2;
+		// $$->vector_int.push_back(new_frame_size_for_arg);
+		$$->vector_NTinfo.push_back($1);
+		$$->vector_NTmem_location.push_back(get_mem_location($1));
 	}
 	;
  
