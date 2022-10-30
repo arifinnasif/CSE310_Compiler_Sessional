@@ -40,5 +40,10 @@ class NonTerminalInfo {
 
     string var_name;
 
+    // string inh_func_name;
+    
+    vector<NonTerminalInfo *> vector_NTinfo;
+    vector<string> vector_NTmem_location;
+
 };
 #endif

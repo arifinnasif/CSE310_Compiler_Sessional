@@ -124,7 +124,7 @@ ALPHANUM [a-zA-Z_0-9]
     return RETURN;
 }
 
-"printf" {
+"println" {
 	// log_stream<<endl<<"Line no "<<line_count<<": Token <" << to_upper(yytext) << "> Lexeme "<< yytext <<" found"<<endl;
 	// token_stream<<"<"<< to_upper(yytext) <<"> ";
 

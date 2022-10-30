@@ -9,7 +9,7 @@
 #include "lib/src/SymbolTable/1805097_SymbolTable.h"
 #include "lib/src/util/NonTerminalInfo.h"
 
-#define ADDITIONAL_SEM_ERR 1
+#define ADDITIONAL_SEM_ERR 0
 // #define YYSTYPE SymbolInfo*
 
 #define BUCKET_SIZE 32
@@ -34,7 +34,7 @@ ofstream log_stream;
 ofstream error_stream;
 ofstream token_stream(TOKEN_FILENAME);
 ofstream code_stream(CODE_FILENAME);
-ofstream optimezed_code_stream(OPTIMIZED_CODE_FILENAME);
+ofstream optimized_code_stream(OPTIMIZED_CODE_FILENAME);
 
 
 void yyerror(const char *s)
@@ -344,9 +344,13 @@ string get_mem_location(NonTerminalInfo * arg) {
 string func_def_name;
 string func_dec_name;
 
-vector< pair<string,int> > _vector_replacement;
+vector<string> logic_expr_stack;
+vector<string> stmt_for_stack;
+vector<string> stmt_if_stack;
+vector<string> stmt_if_else_stack;
+vector<string> stmt_while_stack;
 
-int dummy =0;
+vector<string> expr_mem_location_stack;
 
 
 %}
@@ -371,7 +375,7 @@ int dummy =0;
 %type <nonTerminalInfo> type_specifier declaration_list parameter_list compound_statement statements
 %type <nonTerminalInfo> var_declaration statement expression_statement
 %type <nonTerminalInfo> expression logic_expression rel_expression simple_expression term
-%type <nonTerminalInfo> unary_expression factor argument_list arguments
+%type <nonTerminalInfo> unary_expression factor argument_list arguments action_after_cond
 //%type <vector_declaration_list> 
 
 %define parse.error verbose
@@ -399,93 +403,7 @@ start: program {
 		//write your code in this block in all the similar blocks below
 		log("production", "start : program");
 
-		if(!error_count) {
-			code_stream<<".MODEL SMALL"<<endl; 
-			code_stream<<".STACK 100H "<<endl;
-
-			code_stream<<".DATA"<<endl;
-			code_stream<<"0OUTPUT_ARG             DW ?\n\
-			0OUTPUT_PROC_OUTSTRING	DB \"000000$\" \n\
-			0OUTPUT_PROC_IS_NEG		DB 0  \n\
-			\n\
-			CR						EQU 0DH\n\
-			LF						EQU 0AH\n\
-			\n\
-			NL						DB CR,LF,'$'\n"<<endl;
-
-			code_stream<<"; global var section" <<endl;
-
-			// global data goes here
-			for(auto g : global_vars) {
-				if(g.second == -1) {
-					// is not an array
-					code_stream<<g.first<<" DW 0"<<endl;
-				} else {
-					// is an array
-					code_stream<<g.first<<" DW "<<g.second<<" DUP(0)"<<endl;
-				}
-			}
-
-			code_stream<<".CODE"<<endl;
-			// code goes here
-			code_stream<<"OUTPUT PROC\n\
-			    LEA SI, 0OUTPUT_PROC_OUTSTRING\n\
-			    ADD SI, 6\n\
-			    MOV AX, 0OUTPUT_ARG\n\
-			    \n\
-			    CMP AX, 0     \n\
-			    JL IS_NEG\n\
-			    MOV 0OUTPUT_PROC_IS_NEG, 0\n\
-			    \n\
-			    JMP END_IS_NEG\n\
-			    IS_NEG:  \n\
-			    MOV 0OUTPUT_PROC_IS_NEG, 1\n\
-			    NEG AX\n\
-			    \n\
-			    END_IS_NEG:\n\
-			    \n\
-			    PRINT_LOOP:\n\
-			        DEC SI\n\
-			        \n\
-			        MOV DX, 0\n\
-			        ; DX:AX = 0000:AX\n\
-			        \n\
-			        MOV CX, 10\n\
-			        DIV CX\n\
-			        \n\
-			        ADD DL, '0'\n\
-			        MOV [SI], DL\n\
-			        \n\
-			        CMP AX, 0\n\
-			        JNE PRINT_LOOP\n\
-			    \n\
-			    \n\
-			    CMP 0OUTPUT_PROC_IS_NEG, 0\n\
-			    JE END_ADD_MINUS\n\
-			    \n\
-			    ;ADD MINUS\n\
-			    DEC SI\n\
-			    MOV [SI], '-'\n\
-			    \n\
-			    END_ADD_MINUS:\n\
-			    MOV DX, SI\n\
-			    MOV AH, 9\n\
-			    INT 21H \n\
-			    \n\
-			    LEA DX, NL\n\
-			    MOV AH, 09H\n\
-			    INT 21H\n\
-			    \n\
-			    RET\n\
-			\n\
-			OUTPUT ENDP\n"<<endl;
-
-			code_stream<<$1->code<<endl;
-
-			code_stream<<"END MAIN"<<endl;
-
-		}
-
+		
 
 		
 		// log("matched", $$->name);
@@ -502,8 +420,8 @@ program: program unit {
 		// safe_delete($2);
 
 		// code
-		$$->code = $1->code;
-		$$->code += $2->code;
+		// $$->code = $1->code;
+		// $$->code += $2->code;
 	}
 	| unit {
 		log("production", "program : unit");
@@ -512,7 +430,7 @@ program: program unit {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	;
 	
@@ -540,7 +458,7 @@ unit: var_declaration {
 		frame_size = 0;
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
     ;
      
@@ -641,27 +559,21 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		func_def_name=$2->getName();
 
+		// code
+
+		code_stream<<"\n\n"+$2->getName() + " PROC\n";
+
+		if($2->getName() == "main") {
+			code_stream<<"MOV AX, @DATA\n";
+			code_stream<<"MOV DS, AX\n";
+		}
+
+		code_stream<<"PUSH BP\n";
+		code_stream<<"MOV BP, SP\n\n";
+
 	}
 	compound_statement {
-		// if(SymbolInfo* temp = symbolTable->lookup($2->getName())) {
-			// if(!temp->isFunction())
-			// 	err("multi_dec", $2->getName());
-			// else if(temp->isFunction()) {
-			// 	if(temp->isFunctionDefined())
-			// 		err("redef", $2->getName());
-
-			// 	if(temp->datatype != $1->name)
-			// 		err("return_mismatch",temp->getName());
-			// }
-			// temp->setAsFunctionDefined();
-
-		// } else {
-			// $2->setAsFunction();
-			// $2->setAsFunctionDefined();
-			// $2->arglist = $4->vector_str;
 		
-			// symbolTable->insert($2);
-		// }
 			
 
 		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
@@ -684,41 +596,24 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("matched", $$->name);
 
-		// code
+		// // code
 
-		$$->code = $2->getName() + " PROC\n";
 
-		if($2->getName() == "main") {
-			$$->code += "MOV AX, @DATA\n";
-			$$->code += "MOV DS, AX\n";
-		}
+		code_stream<< "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
 
-		$$->code += "PUSH BP\n";
-		$$->code += "MOV BP, SP\n";
-		$$->code += "SUB SP, "+ to_string(frame_size) +"\n";
-
-		for(int i=0;i<_vector_replacement.size();i++) {
-			$7->code = regex_replace($7->code, regex(_vector_replacement[i].first), get_temp_stack_slot(frame_size+_vector_replacement[i].second));
-		}
-		_vector_replacement.clear();
-
-		$$->code += $7->code;
-
-		$$->code += "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
-
-		$$->code += "ADD SP, "+ to_string(frame_size) +"\n";
-		$$->code += "POP BP\n";
+		
+		code_stream<< "POP BP\n";
 
 
 		if($2->getName() == "main") {
-			$$->code += "MOV AH, 4CH\n";
-			$$->code += "INT 21H\n";
+			code_stream<< "MOV AH, 4CH\n";
+			code_stream<< "INT 21H\n";
 			
 		} else {
-			$$->code += "RET\n";
+			code_stream<< "RET\n";
 		}
 
-		$$->code += $2->getName()+" ENDP\n\n\n\n";
+		code_stream<< $2->getName()+" ENDP\n\n\n\n";
 	}
 
 	| type_specifier ID LPAREN parameter_list error RPAREN {
@@ -775,25 +670,7 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 	}
 	compound_statement {
-		// if(SymbolInfo* temp = symbolTable->lookup($2->getName())) {
-			// if(!temp->isFunction())
-			// 	err("multi_dec", $2->getName());
-			// else if(temp->isFunction()) {
-			// 	if(temp->isFunctionDefined())
-			// 		err("redef", $2->getName());
-
-			// 	if(temp->datatype != $1->name)
-			// 		err("return_mismatch",temp->getName());
-			// }
-			// temp->setAsFunctionDefined();
-
-		// } else {
-			// $2->setAsFunction();
-			// $2->setAsFunctionDefined();
-			// $2->arglist = $4->vector_str;
 		
-			// symbolTable->insert($2);
-		// }
 			
 
 		log("production", "func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement");
@@ -850,20 +727,23 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 		
 			symbolTable->insert($2);
 		}
+
+		func_def_name=$2->getName();
+
+		// code
+
+		code_stream<<$2->getName() + " PROC\n";
+
+		if($2->getName() == "main") {
+			code_stream<<"MOV AX, @DATA\n";
+			code_stream<<"MOV DS, AX\n";
+		}
+
+		code_stream<<"PUSH BP\n";
+		code_stream<<"MOV BP, SP\n";
 	}
 	compound_statement {
-		// if(SymbolInfo* temp = symbolTable->lookup($2->getName())) {
-		// 	if(!temp->isFunction())
-		// 		err("multi_dec", $2->getName());
-		// 	else if(temp->isFunctionDefined())
-		// 		err("redef", $2->getName());
-		// 	temp->setAsFunctionDefined();
-		// } else {
-		// 	$2->setAsFunction();
-		// 	$2->setAsFunctionDefined();
 		
-		// 	symbolTable->insert($2);
-		// }
 		
 
 		log("production", "func_definition : type_specifier ID LPAREN RPAREN compound_statement");
@@ -883,43 +763,27 @@ func_definition: type_specifier ID LPAREN parameter_list RPAREN {
 
 		log("matched", $$->name);
 
-		// code
-
-		$$->code = $2->getName() + " PROC\n";
-
-		if($2->getName() == "main") {
-			$$->code += "MOV AX, @DATA\n";
-			$$->code += "MOV DS, AX\n";
-		}
-
-		$$->code += "PUSH BP\n";
-		$$->code += "MOV BP, SP\n";
-		$$->code += "SUB SP, "+ to_string(frame_size) +"\n";
-
-		for(int i=0;i<_vector_replacement.size();i++) {
-			$6->code = regex_replace($6->code, regex(_vector_replacement[i].first), get_temp_stack_slot(frame_size+_vector_replacement[i].second));
-		}
-		_vector_replacement.clear();
-
-		$$->code += $6->code;
+		// // code
 
 		
 
-		$$->code += "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
+		
 
-		$$->code += "ADD SP, "+ to_string(frame_size) +"\n";
-		$$->code += "POP BP\n";
+		code_stream<< "\nFUNC_"+$2->getName()+"_RETURN_LABEL:\n";
+
+
+		code_stream<< "POP BP\n";
 
 
 		if($2->getName() == "main") {
-			$$->code += "MOV AH, 4CH\n";
-			$$->code += "INT 21H\n";
+			code_stream<< "MOV AH, 4CH\n";
+			code_stream<< "INT 21H\n";
 
 		} else {
-			$$->code += "RET\n";
+			code_stream<< "RET\n";
 		}
 
-		$$->code += $2->getName()+" ENDP\n";
+		code_stream<< $2->getName()+" ENDP\n";
 	}
 	;				
 
@@ -1051,7 +915,7 @@ compound_statement: LCURL {
 		symbolTable->printAllScopeTable(log_stream);
 		log("custom", "");
 		// code
-		$$->code = $3->code;
+		// $$->code = $3->code;
 
 		symbolTable->exitScope();
 	}
@@ -1193,6 +1057,8 @@ declaration_list: declaration_list COMMA ID {
 
 		log("matched", $$->name);
 
+		// code
+
 		if(symbolTable->getCurrentID() == "1") {
 			// global space
 			global_vars.push_back(make_pair($3->getName(), -1));
@@ -1235,6 +1101,8 @@ declaration_list: declaration_list COMMA ID {
 
 		log("matched", $$->name);
 
+		// code
+
 		if(symbolTable->getCurrentID() == "1") {
 			// global space
 			global_vars.push_back(make_pair($3->getName(), arr_size));
@@ -1259,10 +1127,25 @@ declaration_list: declaration_list COMMA ID {
 
 		$$ = $1;
 		$$->name += ", " + $3->getName() + "[" + $5->getName() + "]";
+		int arr_size = stoi($3->getName());
 		$3-> setAsArray(atoi($5->getName().c_str()));
 		$$->vector_si.push_back($3);
 
 		log("matched", $$->name);
+
+		// code
+
+		if(symbolTable->getCurrentID() == "1") {
+			// global space
+			global_vars.push_back(make_pair($3->getName(), arr_size));
+
+		} else {
+			// local space
+			// SymbolInfo* temp = symbolTable->lookupCurrent($1->getName());
+			frame_size+=2*arr_size;
+			$3->frame_offset = frame_size;
+
+		}
 	}
  	| ID {
 			
@@ -1277,6 +1160,8 @@ declaration_list: declaration_list COMMA ID {
 		$$->vector_si.push_back($1);
 
 		log("matched", $$->name);
+
+		// code
 
 		if(symbolTable->getCurrentID() == "1") {
 			// global space
@@ -1304,6 +1189,7 @@ declaration_list: declaration_list COMMA ID {
 
 		log("matched", $$->name);
 
+		// code
 
 		if(symbolTable->getCurrentID() == "1") {
 			// global space
@@ -1341,7 +1227,7 @@ statements: statement {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	| statements statement {
 		log("production", "statements : statements statement");
@@ -1352,8 +1238,8 @@ statements: statement {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
-		$$->code += $2->code;
+		// $$->code = $1->code;
+		// $$->code += $2->code;
 	}
 	;
 	   
@@ -1361,6 +1247,9 @@ statement: var_declaration {
 		log("production", "statement : var_declaration");
 
 		log("matched", $$->name);
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 	| expression_statement {
 		log("production", "statement : expression_statement");
@@ -1368,112 +1257,178 @@ statement: var_declaration {
 		log("matched", $$->name);
 
 		// code
-		$$->code = "\n; " + $1->name + "\n"+ $1->code;
+		// $$->code = "\n; " + $1->name + "\n"+ $1->code;
+		code_stream<<"; " + regex_replace($1->name, regex("\n"), " ") + "\n\n";
 	}
 	| compound_statement {
 		log("production", "statement : compound_statement");
 
 		log("matched", $$->name);
 	}
-	| FOR LPAREN expression_statement expression_statement expression RPAREN statement {
+	| FOR LPAREN expression_statement {
+		// code
+		string end_loop = get_new_label();
+		string loop = get_new_label();
+		string inc_label_start = get_new_label();
+		string inc_label_end = get_new_label();
+
+		code_stream<<loop+":\n";
+
+		stmt_for_stack.push_back(inc_label_end);
+		stmt_for_stack.push_back(inc_label_start);
+		stmt_for_stack.push_back(loop);
+		stmt_for_stack.push_back(end_loop);
+
+		////
+		code_stream<<(string)"; " + "code for FOR loop init" + "\n\n";
+	} expression_statement {
+		// code
+		code_stream<<"CMP "+get_mem_location($5)+", 0\n";
+		code_stream<<"JE "+stmt_for_stack[stmt_for_stack.size() - 1]+"\n";
+		code_stream<<"JMP "+stmt_for_stack[stmt_for_stack.size() - 4]+"\n";
+		code_stream<<stmt_for_stack[stmt_for_stack.size() - 3]+":\n";
+
+		////
+		code_stream<<(string)"; " + "code for cond check" + "\n\n";
+
+	} expression {
+		// code
+		code_stream<<"JMP "+stmt_for_stack[stmt_for_stack.size() - 2]+"\n";
+		code_stream<<stmt_for_stack[stmt_for_stack.size() - 4]+":\n";
+	} RPAREN statement {
 		log("production", "statement : FOR LPAREN expression_statement expression_statement expression RPAREN statement");
 
 		$$ = new NonTerminalInfo();
-		$$->name = "for ( " + $3->name + $4->name + $5->name + " ) " + $7->name;
-		for(auto i : $7->vector_str) $$->vector_str.push_back(i);
+		$$->name = "for ( " + $3->name + $5->name + $7->name + " ) " + $10->name;
+		for(auto i : $10->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 
 		// code
-		string init_code = $3->code;
-		string cond_code = $4->code;
-		string inc_code = $5->code;
-		string body_code = $7->code;
+		
+		
+		code_stream<<"JMP "+stmt_for_stack[stmt_for_stack.size() - 3]+"\n";
+		code_stream<<stmt_for_stack[stmt_for_stack.size()-1]+":\n";
+		////
+		code_stream<<(string)"; " + "code for FOR loop, " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 
-		string end_loop = get_new_label();
-		string loop = get_new_label();
-
-		$$->code = init_code;
-		$$->code += loop+":\n";
-		$$->code += cond_code;
-		$$->code += "CMP "+get_mem_location($4)+", 0\n";
-		$$->code += "JE "+end_loop+"\n";
-		$$->code += body_code;
-		$$->code += inc_code;
-		$$->code += "JMP "+loop+"\n";
-		$$->code += end_loop+":\n";
+		stmt_for_stack.pop_back();
+		stmt_for_stack.pop_back();
+		stmt_for_stack.pop_back();
+		stmt_for_stack.pop_back();
 	}
-	| IF LPAREN expression RPAREN statement %prec LESS_PREC_THAN_ELSE {
+	| IF LPAREN expression action_after_cond RPAREN statement %prec LESS_PREC_THAN_ELSE {
 		log("production", "statement : IF LPAREN expression RPAREN statement");
 
 		$$ = new NonTerminalInfo();
-		$$->name = "if ( " + $3->name + " ) \n" + $5->name;
-		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
+		$$->name = "if ( " + $3->name + " ) \n" + $6->name;
+		for(auto i : $6->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 
 		// code
-		string cond_code = $3->code;
-		string body_code = $5->code;
+		
+		string end_if = stmt_if_else_stack.back();
+		
+		stmt_if_else_stack.pop_back();
+		stmt_if_else_stack.pop_back();
 
-		string end_if = get_new_label();
+		code_stream<<end_if+":\n";
 
-		$$->code = cond_code;
-		$$->code += "CMP "+get_mem_location($3)+", 0\n";
-		$$->code += "JE "+end_if+"\n";
-		$$->code += body_code;
-		$$->code += end_if+":\n";
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
-	| IF LPAREN expression RPAREN statement ELSE statement {
+	| IF LPAREN expression action_after_cond RPAREN statement ELSE {
+		{
+		// code
+
+		string else_if = stmt_if_else_stack[stmt_if_else_stack.size()-1];
+		string end_if = stmt_if_else_stack[stmt_if_else_stack.size()-2];
+
+		code_stream<<"JMP "+end_if+"\n";
+		code_stream<<else_if+":\n";
+
+
+		////
+		code_stream<<(string)"; " + "code for IF statement else block (before)" + "\n\n";
+
+		
+		
+	}
+	} statement {
 		log("production", "statement : IF LPAREN expression RPAREN statement ELSE statement");
 
 		$$ = new NonTerminalInfo();
-		$$->name = "if ( " + $3->name + " ) \n" + $5->name + "\nelse\n" + $7->name;
-		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
+		$$->name = "if ( " + $3->name + " ) \n" + $6->name + "\nelse\n" + $9->name;
+		for(auto i : $6->vector_str) $$->vector_str.push_back(i);
+		for(auto i : $9->vector_str) $$->vector_str.push_back(i);
+
+		log("matched", $$->name);
+
+		// code
+
+		string else_if = stmt_if_else_stack[stmt_if_else_stack.size()-1];
+		string end_if = stmt_if_else_stack[stmt_if_else_stack.size()-2];
+		
+		code_stream<<end_if+":\n";
+
+		////
+		code_stream<<(string)"; " + "code for IF statement, " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
+
+		stmt_if_else_stack.pop_back();
+		stmt_if_else_stack.pop_back();
+	}
+	| WHILE LPAREN {
+		// code
+
+		string loop = get_new_label();
+		string end_loop = get_new_label();
+
+		stmt_while_stack.push_back(end_loop);
+		stmt_while_stack.push_back(loop);
+		
+		code_stream<<loop+":\n";
+
+		////
+		code_stream<<(string)"; " + "code for WHILE loop cond check (before)" + "\n\n";
+		
+	} expression {
+		// code
+		
+
+		string loop = stmt_while_stack[stmt_while_stack.size()-1];
+		string end_loop = stmt_while_stack[stmt_while_stack.size()-2];
+		
+		
+		code_stream<<"CMP "+get_mem_location($4)+", 0\n";
+		code_stream<<"JE "+end_loop+"\n";
+
+		////
+		code_stream<<(string)"; " + "code for WHILE loop cond check" + "\n\n";
+		
+	} RPAREN statement {
+		log("production", "statement : WHILE LPAREN expression RPAREN statement");
+
+		$$ = new NonTerminalInfo();
+		$$->name = "while ( " + $4->name + " ) \n" + $7->name;
 		for(auto i : $7->vector_str) $$->vector_str.push_back(i);
 
 		log("matched", $$->name);
 
 		// code
-		string cond_code = $3->code;
-		string body_code_true = $5->code;
-		string body_code_false = $7->code;
 
-		string else_if = get_new_label();
-		string end_if = get_new_label();
-
-		$$->code = cond_code;
-		$$->code += "CMP "+get_mem_location($3)+", 0\n";
-		$$->code += "JE "+else_if+"\n";
-		$$->code += body_code_true;
-		$$->code += "JMP "+end_if+"\n";
-		$$->code += else_if+":\n";
-		$$->code += body_code_false;
-		$$->code += end_if+":\n";
-	}
-	| WHILE LPAREN expression RPAREN statement {
-		log("production", "statement : WHILE LPAREN expression RPAREN statement");
-
-		$$ = new NonTerminalInfo();
-		$$->name = "while ( " + $3->name + " ) \n" + $5->name;
-		for(auto i : $5->vector_str) $$->vector_str.push_back(i);
-
-		log("matched", $$->name);
-
-		// code
-		string cond_code = $3->code;
-		string body_code = $5->code;
-
-		string loop = get_new_label();
-		string end_loop = get_new_label();
+		string loop = stmt_while_stack[stmt_while_stack.size()-1];
+		string end_loop = stmt_while_stack[stmt_while_stack.size()-2];
 		
-		$$->code = loop+":\n";
-		$$->code += cond_code;
-		$$->code += "CMP "+get_mem_location($3)+", 0\n";
-		$$->code += "JE "+end_loop+"\n";
-		$$->code += body_code;
-		$$->code += "JMP "+loop+"\n";
-		$$->code += end_loop+":\n";
+		code_stream<<"JMP "+loop+"\n";
+		code_stream<<end_loop+":\n";
+
+		////
+		code_stream<<(string)"; " + "code for WHILE loop, " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
+
+		stmt_while_stack.pop_back();
+		stmt_while_stack.pop_back();
 	}
 	| PRINTLN LPAREN ID RPAREN SEMICOLON {
 		log("production", "statement : PRINTLN LPAREN ID RPAREN SEMICOLON");
@@ -1499,13 +1454,18 @@ statement: var_declaration {
 
 		// code
 		if(temp->table_id == "1") {
-			$$->code = "MOV CX, "+temp->getName()+"\n";
+			code_stream<<"MOV CX, "+temp->getName()+"\n";
 		} else {
-			$$->code = "MOV CX, "+get_temp_stack_slot(temp->frame_offset)+"\n";
+			code_stream<<"MOV CX, "+get_temp_stack_slot(temp->frame_offset)+"\n";
 		}
 		
-		$$->code +="MOV 0OUTPUT_ARG, CX\n";
-		$$->code += "CALL OUTPUT\n";
+		code_stream<<"MOV OUTPUT_ARG, CX\n";
+		code_stream<<"SUB SP, "+to_string(frame_size)+"\n";
+		code_stream<<"CALL OUTPUT\n";
+		code_stream<<"ADD SP, "+to_string(frame_size)+"\n";
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 	| RETURN expression SEMICOLON {
 		log("production", "statement : RETURN expression SEMICOLON");
@@ -1517,11 +1477,41 @@ statement: var_declaration {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $2->code;
-		$$->code += "MOV AX, "+get_mem_location($2)+"\n";
-		$$->code += "JMP FUNC_"+func_def_name+"_RETURN_LABEL\n";
+		// $$->code = $2->code;
+		code_stream<<"MOV AX, "+get_mem_location($2)+"\n";
+		code_stream<<"JMP FUNC_"+func_def_name+"_RETURN_LABEL\n";
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 	;
+
+action_after_cond : {
+		// code
+
+		string else_if = get_new_label();
+		string end_if = get_new_label();
+
+		
+		code_stream<<"CMP "+expr_mem_location_stack.back()+", 0\n"; expr_mem_location_stack.pop_back();
+		code_stream<<"JE "+else_if+"\n";
+		
+		stmt_if_else_stack.push_back(end_if);
+		stmt_if_else_stack.push_back(else_if);
+		/*
+		{
+		// code
+		string end_if = get_new_label();
+
+		
+		code_stream<<"CMP "+get_mem_location($3)+", 0\n";
+		code_stream<<"JE "+end_if+"\n";
+
+		stmt_if_stack.push_back(end_if);
+	}
+		*/
+
+	}
 	  
 expression_statement: SEMICOLON	{
 		log("production", "expression_statement : SEMICOLON");
@@ -1539,7 +1529,7 @@ expression_statement: SEMICOLON	{
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	| expression error {
 		log("custom", "unterminated statement found");
@@ -1619,12 +1609,12 @@ variable: ID {
 				$$->is_global=true;
 				$$->is_array=true;
 				$$->code += "MOV BX, "+ get_temp_stack_slot($3->frame_offset) +"\n";
-				$$->code += "ADD BX, BX\n";
+				$$->code += "SHL BX, 1\n";
 			} else {
 				$$->is_array=true;
 				$$->frame_offset = temp->frame_offset;
 				$$->code += "MOV SI, "+ get_temp_stack_slot($3->frame_offset) +"\n";
-				$$->code += "ADD SI, SI\n";
+				$$->code += "SHL SI, 1\n";
 			}
 			$$->var_name = $1->getName();
 		}
@@ -1646,7 +1636,8 @@ expression: logic_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
+		expr_mem_location_stack.push_back(get_mem_location($$));
 	}
 	| variable ASSIGNOP logic_expression {
 		log("production", "expression : variable ASSIGNOP logic_expression");
@@ -1655,59 +1646,7 @@ expression: logic_expression {
 			err("void_func", "");
 			$$->expr_val_type = "void";
 		}
-		/*
-		SymbolInfo* temp;
-		if((temp = symbolTable->lookup($1->name)) != NULL) {
-			if(temp->datatype == "int") {
-				if($3->expr_val_type == "int") {
-					// $1->expr_int_val = temp->int_val = $3->expr_int_val;
-					
-				} else if($3->expr_val_type == "float") {
-					// $1->expr_int_val = temp->int_val = $3->expr_float_val;
-					err("int_float", "");
-				}
-			} else if(temp->datatype == "float") {
-				if($3->expr_val_type == "int") {
-					// $1->expr_float_val = temp->float_val = $3->expr_int_val;
-					// err("float_int", "");
-
-				} else if($3->expr_val_type == "float") {
-					// $1->expr_float_val = temp->float_val = $3->expr_float_val;
-					
-				}
-			}
-		} else {
-			if($1->expr_val_type == "int") {
-				if($3->expr_val_type == "int") {
-					// $1->expr_int_val = $3->expr_int_val;
-					
-				} else if($3->expr_val_type == "float") {
-					// $1->expr_int_val = $3->expr_float_val;
-					err("int_float", "");
-				}
-			} else if($1->expr_val_type == "float") {
-				if($3->expr_val_type == "int") {
-					// $1->expr_float_val = $3->expr_int_val;
-					// err("float_int", "");
-
-				} else if($3->expr_val_type == "float") {
-					// $1->expr_float_val = $3->expr_float_val;
-					
-				}
-			}
-		}*/
-
-		/*
-		SymbolInfo* temp;
-		if((temp = symbolTable->lookup($1->name)) != NULL) {
-			if(temp->datatype == "int" && $3->expr_val_type == "float") {
-				err("int_float", "");
-				
-			} else if(temp->datatype == "float" && $3->expr_val_type == "int") {
-				// err("float_int", "");
-			}
-		}
-		*/
+		
 
 		if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
 			err("int_float", "");
@@ -1722,44 +1661,20 @@ expression: logic_expression {
 
 		// code
 		string temp_code = $1->code;
-		$$->code = $3->code;
-		// if($3->is_global) {
-		// 	if($3->is_array) {
-		// 		$$->code += "MOV CX, " + trim(split($3->name, '[')[0]) + "[BX]\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + $3->name +"\n";
-		// 	}
-		// } else {
-		// 	if($3->is_array) {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset, "SI") + "\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($3->frame_offset) +"\n";
-		// 	}
-		// }
+		
 
-		$$->code += "MOV CX, " + get_mem_location($3) + "\n";
+		code_stream<<"MOV CX, " + get_mem_location($3) + "\n";
 
 		
 
-		$$->code += temp_code;
+		code_stream<<temp_code;
 
-		
+		code_stream<<"MOV " + get_mem_location($1) + ", CX\n";
 
-		// if($1->is_global) {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV " + trim(split($1->name, '[')[0]) + "[BX], CX\n";
-		// 	} else {
-		// 		$$->code += "MOV " + $1->name +", CX\n";
-		// 	}
-		// } else {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV " + get_temp_stack_slot($1->frame_offset, "SI") + ", CX\n";
-		// 	} else {
-		// 		$$->code += "MOV " + get_temp_stack_slot($1->frame_offset) +", CX\n";
-		// 	}
-		// }
+		expr_mem_location_stack.push_back(get_mem_location($$));
 
-		$$->code += "MOV " + get_mem_location($1) + ", CX\n";
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 	;
 			
@@ -1771,22 +1686,46 @@ logic_expression: rel_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
-	| rel_expression LOGICOP rel_expression {
+	| rel_expression LOGICOP {
+		if($2->getName()=="&&") {
+			string l_0 = get_new_label();
+			// string l_1 = get_new_label();
+			string l_done = get_new_label();
+
+			
+			code_stream<<"CMP "+get_mem_location($1)+", 0\n";
+			code_stream<<"JE "+l_0+"\n";
+			
+			logic_expr_stack.push_back(l_done);
+			logic_expr_stack.push_back(l_0);
+		} else if($2->getName()=="||") {
+			// string l_0 = get_new_label();
+			string l_1 = get_new_label();
+			string l_done = get_new_label();
+
+			
+			code_stream<<"CMP "+get_mem_location($1)+", 0\n";
+			code_stream<<"JNE "+l_1+"\n";
+			
+			logic_expr_stack.push_back(l_done);
+			logic_expr_stack.push_back(l_1);
+		}
+	} rel_expression {
 		log("production", "logic_expression : rel_expression LOGICOP rel_expression");
 
 		$$->expr_val_type = "int";
 
-		if($1->isExpressionConst && $3-> isExpressionConst) {
+		if($1->isExpressionConst && $4-> isExpressionConst) {
 
 			double val1, val2;
 
 			if($1->expr_val_type == "float") val1 = $1->expr_float_val;
 			else if($1->expr_val_type == "int") val1 = $1->expr_int_val;
 
-			if($3->expr_val_type == "float") val2 = $3->expr_float_val;
-			else if($3->expr_val_type == "int") val2 = $3->expr_int_val;
+			if($4->expr_val_type == "float") val2 = $4->expr_float_val;
+			else if($4->expr_val_type == "int") val2 = $4->expr_int_val;
 
 			if($2->getName() == "||") {
 				$$->expr_int_val = (val1 || val2);
@@ -1796,62 +1735,59 @@ logic_expression: rel_expression {
 
 		} else {
 			$$->isExpressionConst = false;
-			if($1->expr_val_type == "void_func" || $3->expr_val_type == "void_func") {
+			if($1->expr_val_type == "void_func" || $4->expr_val_type == "void_func") {
 				err("void_func", "");
 				$$->expr_val_type = "void";
-			} else if($1->expr_val_type == "void" || $3->expr_val_type == "void") $$->expr_val_type = "void";
+			} else if($1->expr_val_type == "void" || $4->expr_val_type == "void") $$->expr_val_type = "void";
 		}
 
 		// if($1->expr_val_type == "NaN" || $3->expr_val_type == "NaN") $$->expr_val_type = "NaN";
 
 
-		$$->name += " " + $2->getName() + " " +$3->name;
+		$$->name += " " + $2->getName() + " " +$4->name;
 		log("matched", $$->name);
 
 		// code
-		string t1 = $1->code;
-		string t2 = $3->code;
+		// string t1 = $1->code;
+		// string t2 = $3->code;
 
 		if($2->getName()=="&&") {
-			string l_0 = get_new_label();
+			string l_0 = logic_expr_stack.back(); logic_expr_stack.pop_back();
 			// string l_1 = get_new_label();
-			string l_done = get_new_label();
+			string l_done = logic_expr_stack.back(); logic_expr_stack.pop_back();
 
-			$$->code = t1;
-			$$->code += "CMP "+get_mem_location($1)+", 0\n";
-			$$->code += "JE "+l_0+"\n";
-			$$->code += t2;
-			$$->code += "CMP "+get_mem_location($3)+", 0\n";
-			$$->code += "JE "+l_0+"\n";
+			
+			code_stream<<"CMP "+get_mem_location($4)+", 0\n";
+			code_stream<<"JE "+l_0+"\n";
 			frame_size+=2;
 			$$->frame_offset = frame_size;
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
-			$$->code += "JMP "+ l_done +"\n";
-			$$->code += l_0+":\n";
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
-			$$->code += l_done+":\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
+			code_stream<<"JMP "+ l_done +"\n";
+			code_stream<<l_0+":\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
+			code_stream<<l_done+":\n";
 		} else if($2->getName()=="||") {
 			// string l_0 = get_new_label();
-			string l_1 = get_new_label();
-			string l_done = get_new_label();
+			string l_1 = logic_expr_stack.back(); logic_expr_stack.pop_back();
+			string l_done = logic_expr_stack.back(); logic_expr_stack.pop_back();
 
-			$$->code = t1;
-			$$->code += "CMP "+get_mem_location($1)+", 0\n";
-			$$->code += "JNE "+l_1+"\n";
-			$$->code += t2;
-			$$->code += "CMP "+get_mem_location($3)+", 0\n";
-			$$->code += "JNE "+l_1+"\n";
+			
+			code_stream<<"CMP "+get_mem_location($4)+", 0\n";
+			code_stream<<"JNE "+l_1+"\n";
 			frame_size+=2;
 			$$->frame_offset = frame_size;
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
-			$$->code += "JMP "+ l_done +"\n";
-			$$->code += l_1+":\n";
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
-			$$->code += l_done+":\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
+			code_stream<<"JMP "+ l_done +"\n";
+			code_stream<<l_1+":\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
+			code_stream<<l_done+":\n";
 		}
 		
 		$$->is_array = false;
 		$$->is_global = false;
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}	
 	;
 			
@@ -1863,7 +1799,7 @@ rel_expression: simple_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	| simple_expression RELOP simple_expression	{
 		log("production", "rel_expression : simple_expression RELOP simple_expression");
@@ -1907,38 +1843,37 @@ rel_expression: simple_expression {
 		log("matched", $$->name);
 
 		// code
-		string t1 = $1->code;
-		string t2 = $3->code;
-
-		$$->code = t1;
-		$$->code += t2;
-		$$->code += "MOV AX, "+get_mem_location($1)+"\n";
-		$$->code += "CMP AX, " + get_mem_location($3) + "\n";
+		
+		code_stream<<"MOV AX, "+get_mem_location($1)+"\n";
+		code_stream<<"CMP AX, " + get_mem_location($3) + "\n";
 
 		string l_done = get_new_label();
 		string l1 = get_new_label();
 
 		if($2->getName() == "==") {
-			$$->code += "JE "+l1+"\n";
+			code_stream<<"JE "+l1+"\n";
 		} else if($2->getName() == "<=") {
-			$$->code += "JLE "+l1+"\n";
+			code_stream<<"JLE "+l1+"\n";
 		} else if($2->getName() == ">=") {
-			$$->code += "JGE "+l1+"\n";
+			code_stream<<"JGE "+l1+"\n";
 		} else if($2->getName() == "<") {
-			$$->code += "JL "+l1+"\n";
+			code_stream<<"JL "+l1+"\n";
 		} else if($2->getName() == ">") {
-			$$->code += "JG "+l1+"\n";
+			code_stream<<"JG "+l1+"\n";
 		}
 		
 		frame_size+=2;
 		$$->frame_offset = frame_size;
-		$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
-		$$->code += "JMP " + l_done + "\n";
-		$$->code += l1+":\n";
-		$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
-		$$->code += l_done+":\n";
+		code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 0\n";
+		code_stream<<"JMP " + l_done + "\n";
+		code_stream<<l1+":\n";
+		code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", 1\n";
+		code_stream<<l_done+":\n";
 		$$->is_array = false;
 		$$->is_global = false;
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 	;
 				
@@ -1950,7 +1885,7 @@ simple_expression: term {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	| simple_expression ADDOP term {
 		log("production", "simple_expression : simple_expression ADDOP term");
@@ -1980,23 +1915,22 @@ simple_expression: term {
 		log("matched", $$->name);
 
 		// code
-		string t1 = $1->code;
-		string t2 = $3->code;
-
-		$$->code = t1;
-		$$->code += t2;
-		$$->code += "MOV CX, "+get_mem_location($1)+"\n";
+		
+		code_stream<<"MOV CX, "+get_mem_location($1)+"\n";
 		if($2->getName() == "+") {
-			$$->code += "ADD CX, "+get_mem_location($3)+"\n";
+			code_stream<<"ADD CX, "+get_mem_location($3)+"\n";
 		} else {
-			$$->code += "SUB CX, "+get_mem_location($3)+"\n";
+			code_stream<<"SUB CX, "+get_mem_location($3)+"\n";
 		}
 		frame_size+=2;
 		$$->frame_offset = frame_size;
 		
-		$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", CX\n";
+		code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", CX\n";
 		$$->is_array = false;
 		$$->is_global = false;
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
 
 	| simple_expression ADDOP error term{
@@ -2010,15 +1944,7 @@ simple_expression: term {
 
 		yyerrok;
 
-		// if($1->expr_val_type == "int" && $3->expr_val_type == "int") {
-		// 	$$->expr_int_val = calc($2->getName(), $1->expr_int_val, $3->expr_int_val, $$->expr_val_type);
-		// } else if($1->expr_val_type == "int" && $3->expr_val_type == "float") {
-		// 	$$->expr_float_val = calc($2->getName(), $1->expr_int_val, $3->expr_float_val, $$->expr_val_type);
-		// } else if($1->expr_val_type == "float" && $3->expr_val_type == "float") {
-		// 	$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_float_val, $$->expr_val_type);
-		// } else if($1->expr_val_type == "float" && $3->expr_val_type == "int") {
-		// 	$$->expr_float_val = calc($2->getName(), $1->expr_float_val, $3->expr_int_val, $$->expr_val_type);
-		// }
+		
 
 		$$->name += " " + $2->getName() + " " +$4->name;
 		log("matched", $$->name);
@@ -2035,7 +1961,7 @@ term: unary_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
     | term MULOP unary_expression {
 		log("production", "term : term MULOP unary_expression");
@@ -2091,27 +2017,27 @@ term: unary_expression {
 		log("matched", $$->name);
 
 		// code
-		string t1 = $1->code;
-		string t2 = $3->code;
-
-		$$->code = t1;
-		$$->code += t2;
-		$$->code += "MOV AX, "+get_mem_location($1)+"\n";
-		$$->code += "MOV DX, 0\n";
+		
+		code_stream<<"MOV AX, "+get_mem_location($1)+"\n";
+		code_stream<<"MOV DX, 0\n";
+		code_stream<<"CWD\n";
 		if($2->getName() == "*") {
-			$$->code += "IMUL "+get_mem_location($3)+"\n";
+			code_stream<<"IMUL "+get_mem_location($3)+"\n";
 		} else {
-			$$->code += "IDIV "+get_mem_location($3)+"\n";
+			code_stream<<"IDIV "+get_mem_location($3)+"\n";
 		}
 		frame_size+=2;
 		$$->frame_offset = frame_size;
 		if($2->getName() == "%") {
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", DX\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", DX\n";
 		} else {
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", AX\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", AX\n";
 		}
 		$$->is_array = false;
 		$$->is_global = false;
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 	}
     ;
 
@@ -2139,15 +2065,18 @@ unary_expression: ADDOP unary_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $2->code;
+		// $$->code = $2->code;
 		if($1->getName() == "-") {
-			$$->code += "MOV CX, " + get_mem_location($2) +"\n";
-			$$->code += "NEG CX\n";
+			code_stream<<"MOV CX, " + get_mem_location($2) +"\n";
+			code_stream<<"NEG CX\n";
 			frame_size+=2;
-			$$->code += "MOV "+get_temp_stack_slot(frame_size)+", CX\n";
+			code_stream<<"MOV "+get_temp_stack_slot(frame_size)+", CX\n";
 			$$->frame_offset = frame_size;
 			$$->is_array = false;
 			$$->is_global = false;
+
+			////
+			code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 		}
 		
 
@@ -2180,20 +2109,23 @@ unary_expression: ADDOP unary_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $2->code;
-		$$->code += "CMP "+get_mem_location($2)+", 0\n";
+		// $$->code = $2->code;
+		code_stream<<"CMP "+get_mem_location($2)+", 0\n";
 		string l1 = get_new_label();
 		string l2 = get_new_label();
 		frame_size+=2;
-		$$->code += "JE " + l1 + "\n";
-		$$->code += "MOV "+get_temp_stack_slot(frame_size)+", 0\n";
-		$$->code += "JMP "+l2+"\n";
-		$$->code += l1+":\n";
-		$$->code += "MOV "+get_temp_stack_slot(frame_size)+", 1\n";
-		$$->code += l2+":\n";
+		code_stream<<"JE " + l1 + "\n";
+		code_stream<<"MOV "+get_temp_stack_slot(frame_size)+", 0\n";
+		code_stream<<"JMP "+l2+"\n";
+		code_stream<<l1+":\n";
+		code_stream<<"MOV "+get_temp_stack_slot(frame_size)+", 1\n";
+		code_stream<<l2+":\n";
 		$$->frame_offset = frame_size;
 		$$->is_array = false;
 		$$->is_global = false;
+
+		////
+		code_stream<<"; " + regex_replace($$->name, regex("\n"), " ") + "\n\n";
 		
 
 	}
@@ -2205,7 +2137,7 @@ unary_expression: ADDOP unary_expression {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 	}
 	;
 	
@@ -2215,7 +2147,8 @@ factor: variable {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
+		code_stream<<$1->code;
 	}
 	| ID LPAREN argument_list RPAREN {
 		log("production", "factor : ID LPAREN argument_list RPAREN");
@@ -2263,24 +2196,23 @@ factor: variable {
 
 		// code
 		if(!error_count) {
-			$$->code = $3->code;
+			// $$->code = $3->code;
 			for(int i = 0; i < $3->vector_NTmem_location.size(); i++) {
-				$$->code += "MOV CX, "+$3->vector_NTmem_location[i]+"\n";
-				// $$->code += "; framesize "+to_string(frame_size)+"\n";
-				// $$->code += "; i "+to_string(i)+"\n";
-				// $$->code += "MOV "+get_temp_stack_slot(frame_size
-				// 										
-				// 										+2/*for new func ret addr*/
-				// 										+2/*for old func BP*/
-				// 										+2*(i+1)/*actual offset wrt new BP*/)+", CX\n";
-				dummy++;
-				$$->code += "MOV #####REPLACE_AFTER_TOTAL_FRAME_"+to_string(dummy)+"#####, CX\n";
-				_vector_replacement.push_back(make_pair("#####REPLACE_AFTER_TOTAL_FRAME_"+to_string(dummy)+"#####",2+2+2*(i+1)));
+				code_stream<<"MOV CX, "+$3->vector_NTmem_location[i]+"\n";
+				
+				code_stream<<"MOV "+get_temp_stack_slot(frame_size
+														
+														+2/*for new func ret addr*/
+														+2/*for old func BP*/
+														+2*(i+1)/*actual offset wrt new BP*/)+", CX\n";
+				
 			}
-			$$->code += "CALL "+$1->getName()+"\n";
+			code_stream<<"SUB SP, "+to_string(frame_size)+"\n";
+			code_stream<<"CALL "+$1->getName()+"\n";
+			code_stream<<"ADD SP, "+to_string(frame_size)+"\n";
 			frame_size+=2;
 			$$->frame_offset = frame_size;
-			$$->code += "MOV "+get_temp_stack_slot($$->frame_offset)+", AX\n";
+			code_stream<<"MOV "+get_temp_stack_slot($$->frame_offset)+", AX\n";
 		}
 	}
 	| LPAREN expression RPAREN {
@@ -2291,7 +2223,7 @@ factor: variable {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $2->code;
+		// $$->code = $2->code;
 	}
 	| CONST_INT {
 		log("production", "factor : CONST_INT");
@@ -2306,7 +2238,8 @@ factor: variable {
 		// code
 		frame_size+=2;
 		$$->frame_offset = frame_size;
-		$$->code = "MOV " + get_temp_stack_slot($$->frame_offset) +", "+$1->getName()+"\n";
+		
+		code_stream<<"MOV " + get_temp_stack_slot($$->frame_offset) +", "+$1->getName()+"\n";
 	}
 	| CONST_FLOAT  {
 		log("production", "factor : CONST_FLOAT");
@@ -2322,50 +2255,21 @@ factor: variable {
 		log("production", "factor : variable INCOP");
 
 		$$->name += " ++";
-		// postfix
-		// SymbolInfo * temp = symbolTable->lookup($1->name);
-		// if(temp) {
-		// 	temp->float_val++;
-		// 	temp->int_val++;
-		// }
+		
 		log("matched", $$->name);
 
 		// code
 		string temp_code = $1->code;
-		$$->code = $1->code;
-		// if($1->is_global) {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV CX, " + trim(split($1->name, '[')[0]) + "[BX]\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + $1->name +"\n";
-		// 	}
-		// } else {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($1->frame_offset, "SI") + "\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($1->frame_offset) +"\n";
-		// 	}
-		// }
-		$$->code += "MOV CX, " + get_mem_location($1) +"\n";
+		code_stream<< $1->code;
+		
+		code_stream<< "MOV CX, " + get_mem_location($1) +"\n";
 
 		frame_size+=2;
 
-		$$->code+="MOV "+ get_temp_stack_slot(frame_size) +", CX\n"; // frame_size is the frame offset of $$. not assigned before this line for the $1->frame_offset might change also
+		code_stream<<"MOV "+ get_temp_stack_slot(frame_size) +", CX\n"; // frame_size is the frame offset of $$. not assigned before this line for the $1->frame_offset might change also
 		
-		// if($1->is_global) {
-		// 	if($1->is_array) {
-		// 		$$->code += "INC " + trim(split($1->name, '[')[0]) + "[BX]\n";
-		// 	} else {
-		// 		$$->code += "INC " + $1->name +"\n";
-		// 	}
-		// } else {
-		// 	if($1->is_array) {
-		// 		$$->code += "INC " + get_temp_stack_slot($1->frame_offset, "SI") + "\n";
-		// 	} else {
-		// 		$$->code += "INC " + get_temp_stack_slot($1->frame_offset) +"\n";
-		// 	}
-		// }
-		$$->code += "INC " + get_mem_location($1) +"\n";
+		
+		code_stream<< "INC " + get_mem_location($1) +"\n";
 
 		$$->frame_offset=frame_size;
 		$$->is_array=false;
@@ -2376,51 +2280,22 @@ factor: variable {
 		log("production", "factor : variable DECOP");
 
 		$$->name += " --";
-		// postfix
-		// SymbolInfo * temp = symbolTable->lookup($1->name);
-		// if(temp) {
-		// 	temp->float_val--;
-		// 	temp->int_val--;
-		// }
+		
 		log("matched", $$->name);
 		
 
 		// code
 		string temp_code = $1->code;
-		$$->code = $1->code;
-		// if($1->is_global) {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV CX, " + trim(split($1->name, '[')[0]) + "[BX]\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + $1->name +"\n";
-		// 	}
-		// } else {
-		// 	if($1->is_array) {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($1->frame_offset, "SI") + "\n";
-		// 	} else {
-		// 		$$->code += "MOV CX, " + get_temp_stack_slot($1->frame_offset) +"\n";
-		// 	}
-		// }
-		$$->code += "MOV CX, " + get_mem_location($1) +"\n";
+		code_stream<< $1->code;
+		
+		code_stream<< "MOV CX, " + get_mem_location($1) +"\n";
 
 		frame_size+=2;
 
-		$$->code+="MOV "+ get_temp_stack_slot(frame_size) +", CX\n"; // frame_size is the frame offset of $$. not assigned before this line for the $1->frame_offset might change also
+		code_stream<<"MOV "+ get_temp_stack_slot(frame_size) +", CX\n"; // frame_size is the frame offset of $$. not assigned before this line for the $1->frame_offset might change also
 		
-		// if($1->is_global) {
-		// 	if($1->is_array) {
-		// 		$$->code += "DEC " + trim(split($1->name, '[')[0]) + "[BX]\n";
-		// 	} else {
-		// 		$$->code += "DEC " + $1->name +"\n";
-		// 	}
-		// } else {
-		// 	if($1->is_array) {
-		// 		$$->code += "DEC " + get_temp_stack_slot($1->frame_offset, "SI") + "\n";
-		// 	} else {
-		// 		$$->code += "DEC " + get_temp_stack_slot($1->frame_offset) +"\n";
-		// 	}
-		// }
-		$$->code += "DEC " + get_mem_location($1) +"\n";
+		
+		code_stream<< "DEC " + get_mem_location($1) +"\n";
 
 		$$->frame_offset=frame_size;
 		$$->is_array=false;
@@ -2436,7 +2311,7 @@ argument_list: arguments {
 		log("matched", $$->name);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 
 	}
 	| {
@@ -2462,7 +2337,7 @@ arguments: arguments COMMA logic_expression {
 		// safe_delete($3);
 
 		// code
-		$$->code += $3->code;
+		// $$->code += $3->code;
 		// new_frame_size_for_arg += 2;
 		// $$->vector_int.push_back(new_frame_size_for_arg);
 		$$->vector_NTinfo.push_back($3);
@@ -2480,7 +2355,7 @@ arguments: arguments COMMA logic_expression {
 		// safe_delete($1);
 
 		// code
-		$$->code = $1->code;
+		// $$->code = $1->code;
 		// new_frame_size_for_arg += 2;
 		// $$->vector_int.push_back(new_frame_size_for_arg);
 		$$->vector_NTinfo.push_back($1);
@@ -2506,15 +2381,168 @@ int main(int argc,char *argv[])
 	
 	// fp2= fopen(argv[2],"a");
 	// fp3= fopen(argv[3],"a");
-	log_stream.open(argv[2]);
-	error_stream.open(argv[3]);
+	if(argc >= 4) {
+		log_stream.open(argv[2]);
+		error_stream.open(argv[3]);
+	} else {
+		log_stream.open("log.txt");
+		error_stream.open("error.txt");
+	}
+	
 
 
 	symbolTable = new SymbolTable(BUCKET_SIZE);
 	
 
 	yyin=fp;
+
+
+	
+	code_stream<<".MODEL SMALL"<<endl; 
+	code_stream<<".STACK 100H "<<endl;
+	code_stream<<".CODE"<<endl;
+	// code goes here
+	code_stream<<"OUTPUT PROC\n\
+	    LEA SI, OUTPUT_PROC_OUTSTRING\n\
+	    ADD SI, 6\n\
+	    MOV AX, OUTPUT_ARG\n\
+	    \n\
+	    CMP AX, 0     \n\
+	    JL IS_NEG\n\
+	    MOV OUTPUT_PROC_IS_NEG, 0\n\
+	    \n\
+	    JMP END_IS_NEG\n\
+	    IS_NEG:  \n\
+	    MOV OUTPUT_PROC_IS_NEG, 1\n\
+	    NEG AX\n\
+	    \n\
+	    END_IS_NEG:\n\
+	    \n\
+	    PRINT_LOOP:\n\
+	        DEC SI\n\
+	        \n\
+	        MOV DX, 0\n\
+	        ; DX:AX = 0000:AX\n\
+	        \n\
+	        MOV CX, 10\n\
+	        DIV CX\n\
+	        \n\
+	        ADD DL, '0'\n\
+	        MOV [SI], DL\n\
+	        \n\
+	        CMP AX, 0\n\
+	        JNE PRINT_LOOP\n\
+	    \n\
+	    \n\
+	    CMP OUTPUT_PROC_IS_NEG, 0\n\
+	    JE END_ADD_MINUS\n\
+	    \n\
+	    ;ADD MINUS\n\
+	    DEC SI\n\
+	    MOV [SI], '-'\n\
+	    \n\
+	    END_ADD_MINUS:\n\
+	    MOV DX, SI\n\
+	    MOV AH, 9\n\
+	    INT 21H \n\
+	    \n\
+	    LEA DX, NL\n\
+	    MOV AH, 09H\n\
+	    INT 21H\n\
+	    \n\
+	    RET\n\
+	\n\
+	OUTPUT ENDP\n"<<endl;
+
+			
+
+			
+
+		
 	yyparse();
+
+	if(error_count) {
+		// delete contents of code.asm
+		code_stream.close();
+		code_stream.open(CODE_FILENAME, ofstream::out | ofstream::trunc);
+		code_stream.close();
+
+		optimized_code_stream.close();
+	} else {
+		code_stream<<".DATA"<<endl;
+			code_stream<<"OUTPUT_ARG             DW ?\n\
+			OUTPUT_PROC_OUTSTRING	DB \"000000$\" \n\
+			OUTPUT_PROC_IS_NEG		DB 0  \n\
+			\n\
+			CR						EQU 0DH\n\
+			LF						EQU 0AH\n\
+			\n\
+			NL						DB CR,LF,'$'\n"<<endl;
+
+			code_stream<<"; global var section" <<endl;
+
+			// global data goes here
+			for(auto g : global_vars) {
+				if(g.second == -1) {
+					// is not an array
+					code_stream<<g.first<<" DW 0"<<endl;
+				} else {
+					// is an array
+					code_stream<<g.first<<" DW "<<g.second<<" DUP(0)"<<endl;
+				}
+			}
+
+		code_stream<<"END MAIN"<<endl;
+		code_stream.close();
+
+		// optimization
+		ifstream input_from_code(CODE_FILENAME);
+		string line;
+
+		string prev_dst="";
+		string prev_src="";
+
+		bool is_in_a_func = false;
+
+		while(getline(input_from_code, line)) {
+			string replacement_for_current_line = line;
+
+			if(line.size() <= 2 ) {optimized_code_stream<<replacement_for_current_line<<endl; continue;}
+			if(line.size() >= 1 && line.substr(0,1) == ";")  {optimized_code_stream<<replacement_for_current_line<<endl; continue;}
+
+			if(line.size() > 4 && line.substr(line.size()-4) == "PROC") is_in_a_func = true;
+			else if(line.size() > 4 && line.substr(line.size()-4) == "ENDP") is_in_a_func = false;
+
+			// handle mov only
+			string dst = "";
+			string src = "";
+			
+			if(is_in_a_func) {
+				if(line.substr(0,3) == "MOV") {
+					auto temp = split(line.substr(4), ',');
+					dst = trim(temp[0]);
+					src = trim(temp[1]);
+
+					if(prev_dst == src && prev_src == dst || prev_dst == dst && prev_src == src) {
+						src = prev_src;
+						dst = prev_dst;
+
+						replacement_for_current_line = "; removed for peephole";
+					}
+				
+				}
+			}
+
+			prev_dst=dst;
+			prev_src=src;
+
+			optimized_code_stream<<replacement_for_current_line<<endl;
+		}
+
+		input_from_code.close();
+		optimized_code_stream.close();
+		
+	}
 
 	symbolTable->printAllScopeTable(log_stream);
 
@@ -2527,6 +2555,9 @@ int main(int argc,char *argv[])
 
 	log_stream.close();
 	error_stream.close();
+
+	
+
 	
 	return 0;
 }
@@ -2575,8 +2606,8 @@ y.tab.c y.tab.h: 1805097.y
 	$(YC) $(YCFLAGS) 1805097.y
 
 clean:
-	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o
+	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o code.asm optimized_code.asm
 
 clean_all:
-	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o $(LIBDIR)/*.o
+	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o code.asm optimized_code.asm $(LIBDIR)/*.o
 */

@@ -38,7 +38,7 @@ y.tab.c y.tab.h: 1805097.y
 	$(YC) $(YCFLAGS) 1805097.y
 
 clean:
-	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o
+	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o code.asm optimized_code.asm
 
 clean_all:
-	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o $(LIBDIR)/*.o
+	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o code.asm optimized_code.asm $(LIBDIR)/*.o
