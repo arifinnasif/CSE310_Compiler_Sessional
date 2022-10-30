@@ -10,7 +10,7 @@ using namespace std;
 string INPUT_FILE = "input.txt";
 string OUTPUT_FILE = "output.txt";
 
-vector<string> split(string str, char delim) {
+vector<string> split(string str,   char delim) {
     int i=0;
     int start=0;
 
@@ -21,7 +21,7 @@ vector<string> split(string str, char delim) {
         if(str[i]!=delim) {
             if(i==0||str[i-1]==delim) start=i;
             if(str[i+1]=='\0' || str[i+1]=='\r' || str[i+1]==delim) {
-                tkn.push_back(str.substr(start, i-start+1));
+                tkn.push_back(str.substr(start,   i-start+1));
             }
         }
         i++;
@@ -43,7 +43,7 @@ int main() {
 
     vector<string> cmd;
     
-    getline(ifile, line, '\n');
+    getline(ifile,   line,   '\n');
 
     n = stoi(line);
 
@@ -52,20 +52,20 @@ int main() {
     SymbolTable * symbolTable = new SymbolTable(n);
     
 
-    while(getline(ifile, line, '\n')) {
+    while(getline(ifile,   line,   '\n')) {
         ofile<<line<<endl;
         // cout<<line<<endl;
         // while(true) {
-        // getline(cin, line);
-        cmd = split(line, ' ');
+        // getline(cin,   line);
+        cmd = split(line,   ' ');
         
         switch (line[0]) {
             case 'I': {
-                if(symbolTable->insert(cmd[1], cmd[2], &pos1, &pos2)) {
-                    ofile<<"Inserted in ScopeTable# "<<symbolTable->getCurrentID()<<" at position "<<pos1<<", "<<pos2<<""<<endl;
+                if(symbolTable->insert(cmd[1],   cmd[2],   &pos1,   &pos2)) {
+                    ofile<<"Inserted in ScopeTable# "<<symbolTable->getCurrentID()<<" at position "<<pos1<<",   "<<pos2<<""<<endl;
                 } else {
                     SymbolInfo * si = symbolTable->lookup(cmd[1]);
-                    ofile<<"<"<<si->getName()<<","<<si->getType()<<"> already exists in current ScopeTable"<<endl;
+                    ofile<<"<"<<si->getName()<<",  "<<si->getType()<<"> already exists in current ScopeTable"<<endl;
                 }
                 break;
             }
@@ -77,12 +77,12 @@ int main() {
                 }
                 string t_id;
                 SymbolInfo* si;
-                si = symbolTable->lookup(cmd[1], &t_id, &pos1, &pos2);
+                si = symbolTable->lookup(cmd[1],   &t_id,   &pos1,   &pos2);
                 
                 if(si == NULL) {
                     ofile<<"Not found"<<endl;
                 } else {
-                    ofile<<"Found in ScopeTable# "<<t_id<<" at position "<<pos1<<", "<<pos2<<""<<endl;
+                    ofile<<"Found in ScopeTable# "<<t_id<<" at position "<<pos1<<",   "<<pos2<<""<<endl;
                 }
                 break;
             }
@@ -92,9 +92,9 @@ int main() {
                     ofile<<"NO CURRENT SCOPE"<<endl;
                     break;
                 }
-                if(symbolTable->remove(cmd[1], &pos1, &pos2)) {
-                    ofile<<"Found in ScopeTable# "<<symbolTable->getCurrentID()<<" at position "<<pos1<<", "<<pos2<<""<<endl;
-                    ofile<<"Deleted Entry "<<pos1<<", "<<pos2<<" from current ScopeTable"<<endl;
+                if(symbolTable->remove(cmd[1],   &pos1,   &pos2)) {
+                    ofile<<"Found in ScopeTable# "<<symbolTable->getCurrentID()<<" at position "<<pos1<<",   "<<pos2<<""<<endl;
+                    ofile<<"Deleted Entry "<<pos1<<",   "<<pos2<<" from current ScopeTable"<<endl;
                 } else {
                     ofile<<"Not found"<<endl;
                     ofile<<cmd[1]<<" not found"<<endl;
