@@ -31,11 +31,11 @@ $(LIBDIR)/1805097_SymbolInfo.o: $(STDIR)/1805097_SymbolInfo.cpp $(STDIR)/1805097
 $(LIBDIR)/NonTerminalInfo.o: $(UTILDIR)/NonTerminalInfo.cpp $(UTILDIR)/NonTerminalInfo.h
 	$(CC) $(CXXFLAGS) -c $< -o $@
 
-lex.yy.c: 1805097_lex.l
-	$(LC) $(LCFLAGS) 1805097_lex.l
+lex.yy.c: 1805097.l
+	$(LC) $(LCFLAGS) 1805097.l
 
-y.tab.c y.tab.h: parser.y
-	$(YC) $(YCFLAGS) parser.y
+y.tab.c y.tab.h: 1805097.y
+	$(YC) $(YCFLAGS) 1805097.y
 
 clean:
 	rm a.out lex.yy.c lex.yy.o y.tab.c y.tab.h y.tab.o
